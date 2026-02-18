@@ -120,7 +120,7 @@ This creates `prd.json` with user stories structured for autonomous execution.
 # Using OpenAI Codex CLI
 ./scripts/ralph/ralph.sh --tool codex [max_iterations]
 # Optional model override:
-# CODEX_MODEL=openai-codex/gpt-5.3-codex ./scripts/ralph/ralph.sh --tool codex [max_iterations]
+# CODEX_MODEL=gpt-5.3-codex ./scripts/ralph/ralph.sh --tool codex [max_iterations]
 ```
 
 Default is 10 iterations. Use `--tool amp`, `--tool claude`, or `--tool codex` to select your AI coding tool.

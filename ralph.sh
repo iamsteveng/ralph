@@ -7,7 +7,7 @@ set -e
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
 MAX_ITERATIONS=10
-CODEX_MODEL="${CODEX_MODEL:-openai-codex/gpt-5.3-codex}"
+CODEX_MODEL="${CODEX_MODEL:-gpt-5.3-codex}"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
