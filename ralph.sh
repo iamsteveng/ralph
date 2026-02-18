@@ -35,6 +35,8 @@ if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "codex" ]]; then
   exit 1
 fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_DIR="$(pwd)"
+LOGS_DIR="$WORKSPACE_DIR/logs"
 PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
@@ -80,7 +82,10 @@ if [ ! -f "$PROGRESS_FILE" ]; then
   echo "---" >> "$PROGRESS_FILE"
 fi
 
+mkdir -p "$LOGS_DIR"
+
 echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+echo "Workspace logs: $LOGS_DIR"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
@@ -95,8 +100,24 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
     OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
   else
-    # Codex CLI: run non-interactive with the Ralph prompt and capture output
-    OUTPUT=$(codex exec --model "$CODEX_MODEL" "$(cat "$SCRIPT_DIR/prompt.md")" 2>&1 | tee /dev/stderr) || true
+    # Codex CLI: run non-interactive with full permissions and emit JSONL logs per iteration
+    ITER_JSONL="$LOGS_DIR/codex-iteration-$i.jsonl"
+    ITER_LAST_MSG="$LOGS_DIR/codex-iteration-$i-last-message.txt"
+    ITER_STDERR="$LOGS_DIR/codex-iteration-$i-stderr.log"
+
+    codex exec \
+      --model "$CODEX_MODEL" \
+      --dangerously-bypass-approvals-and-sandbox \
+      --json \
+      --output-last-message "$ITER_LAST_MSG" \
+      "$(cat "$SCRIPT_DIR/prompt.md")" \
+      > "$ITER_JSONL" \
+      2> >(tee /dev/stderr "$ITER_STDERR") || true
+
+    OUTPUT="$(cat "$ITER_LAST_MSG" 2>/dev/null || true)"
+    echo "Codex logs written: $ITER_JSONL"
+    echo "Codex last message: $ITER_LAST_MSG"
+    echo "Codex stderr log: $ITER_STDERR"
   fi
   
   # Check for completion signal

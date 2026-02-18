@@ -125,6 +125,16 @@ This creates `prd.json` with user stories structured for autonomous execution.
 
 Default is 10 iterations. Use `--tool amp`, `--tool claude`, or `--tool codex` to select your AI coding tool.
 
+When using `--tool codex`, Ralph runs Codex with:
+- `--dangerously-bypass-approvals-and-sandbox` (full permissions/autonomous execution)
+- `--json` (JSONL event stream)
+- `--output-last-message` (final assistant output per iteration)
+
+Codex artifacts are written to `logs/` in your current working workspace:
+- `logs/codex-iteration-<n>.jsonl`
+- `logs/codex-iteration-<n>-last-message.txt`
+- `logs/codex-iteration-<n>-stderr.log`
+
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
 2. Pick the highest priority story where `passes: false`
