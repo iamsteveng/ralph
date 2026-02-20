@@ -8,6 +8,8 @@ set -e
 TOOL="amp"  # Default to amp for backwards compatibility
 MAX_ITERATIONS=10
 CODEX_MODEL="${CODEX_MODEL:-gpt-5.3-codex}"
+OPENCLAW_SESSION_KEY="${OPENCLAW_SESSION_KEY:-agent:main:main}"
+OPENCLAW_SESSION_ID="${OPENCLAW_SESSION_ID:-}"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -137,6 +139,51 @@ infer_iteration_result() {
   echo "no-op"
 }
 
+resolve_main_session_id() {
+  if [ -n "$OPENCLAW_SESSION_ID" ]; then
+    echo "$OPENCLAW_SESSION_ID"
+    return
+  fi
+
+  if ! command -v openclaw >/dev/null 2>&1; then
+    return
+  fi
+
+  OPENCLAW_SESSION_ID="$(openclaw sessions --json 2>/dev/null | jq -r --arg key "$OPENCLAW_SESSION_KEY" '
+    .sessions
+    | ((map(select(.key == $key))[0]) // (sort_by(.updatedAt) | reverse | .[0]))
+    | .sessionId // empty
+  ')"
+  echo "$OPENCLAW_SESSION_ID"
+}
+
+format_iteration_update_message() {
+  local iteration="$1"
+  local max_iterations="$2"
+  local story_id="$3"
+  local story_title="$4"
+  local result="$5"
+  local commit="$6"
+  local summary="$7"
+
+  printf 'Iteration %s/%s\nStory: %s - %s\nResult: %s\nCommit: %s\nSummary: %s' \
+    "$iteration" "$max_iterations" "$story_id" "$story_title" "$result" "$commit" "$summary"
+}
+
+send_iteration_update() {
+  local message="$1"
+  local session_id
+
+  session_id="$(resolve_main_session_id)"
+  if [ -z "$session_id" ]; then
+    return
+  fi
+
+  set +e
+  openclaw agent --session-id "$session_id" --message "$message" --thinking off --timeout 90 >/dev/null 2>&1
+  set -e
+}
+
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
   echo "==============================================================="
@@ -232,6 +279,9 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     echo "Summary: $ITERATION_SUMMARY"
   } > "$ITERATION_SUMMARY_FILE"
   echo "Iteration summary written: $ITERATION_SUMMARY_FILE"
+
+  ITERATION_UPDATE_MESSAGE="$(format_iteration_update_message "$i" "$MAX_ITERATIONS" "$STORY_ID" "$STORY_TITLE" "$ITERATION_RESULT" "$ITERATION_COMMIT" "$ITERATION_SUMMARY")"
+  send_iteration_update "$ITERATION_UPDATE_MESSAGE"
   
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
