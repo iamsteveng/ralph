@@ -47,3 +47,4 @@ npm run dev
 - Always update AGENTS.md with discovered patterns for future iterations
 - Codex iterations now emit `logs/codex-iteration-<n>-summary.txt` with `Iteration`, `Story`, `Result`, `Commit`, and `Summary` fields for downstream reporting
 - Iteration updates to the main OpenClaw session are sent via `openclaw agent --session-id`; `OPENCLAW_SESSION_ID` and `OPENCLAW_SESSION_KEY` can override session targeting
+- Iteration failure handling is deterministic: retry a `failed` outcome exactly once in the same iteration, but stop immediately on `blocked` or terminal retry failure
