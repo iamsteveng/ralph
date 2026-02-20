@@ -8,6 +8,8 @@ set -e
 TOOL="amp"  # Default to amp for backwards compatibility
 MAX_ITERATIONS=10
 CODEX_MODEL="${CODEX_MODEL:-gpt-5.3-codex}"
+OPENCLAW_SESSION_KEY="${OPENCLAW_SESSION_KEY:-agent:main:main}"
+OPENCLAW_SESSION_ID="${OPENCLAW_SESSION_ID:-}"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -87,37 +89,231 @@ mkdir -p "$LOGS_DIR"
 echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
 echo "Workspace logs: $LOGS_DIR"
 
+extract_story_id_from_text() {
+  local text="$1"
+  echo "$text" | grep -Eo 'US-[0-9]+' | head -n 1 || true
+}
+
+extract_story_title_from_prd() {
+  local story_id="$1"
+  jq -r --arg story_id "$story_id" '.userStories[] | select(.id == $story_id) | .title' "$PRD_FILE" 2>/dev/null | head -n 1 || true
+}
+
+extract_story_id_from_progress() {
+  if [ -f "$PROGRESS_FILE" ]; then
+    grep -Eo 'US-[0-9]+' "$PROGRESS_FILE" | tail -n 1 || true
+  fi
+}
+
+extract_summary_text() {
+  local text="$1"
+  local one_line
+  one_line=$(echo "$text" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')
+  if [ -z "$one_line" ]; then
+    echo "No summary provided."
+  else
+    echo "$one_line" | cut -c1-220
+  fi
+}
+
+infer_iteration_result() {
+  local text="$1"
+  local tool_exit_status="$2"
+  local commit_hash="$3"
+
+  if echo "$text" | grep -qiE '\b(blocked|cannot proceed|need user input|waiting on|requires decision)\b'; then
+    echo "blocked"
+    return
+  fi
+
+  if [ "$tool_exit_status" -ne 0 ] || echo "$text" | grep -qiE '\b(failed|failure|exception|traceback|fatal error)\b'; then
+    echo "failed"
+    return
+  fi
+
+  if [ "$commit_hash" != "none" ]; then
+    echo "completed"
+    return
+  fi
+
+  echo "no-op"
+}
+
+resolve_main_session_id() {
+  if [ -n "$OPENCLAW_SESSION_ID" ]; then
+    echo "$OPENCLAW_SESSION_ID"
+    return
+  fi
+
+  if ! command -v openclaw >/dev/null 2>&1; then
+    return
+  fi
+
+  OPENCLAW_SESSION_ID="$(openclaw sessions --json 2>/dev/null | jq -r --arg key "$OPENCLAW_SESSION_KEY" '
+    .sessions
+    | ((map(select(.key == $key))[0]) // (sort_by(.updatedAt) | reverse | .[0]))
+    | .sessionId // empty
+  ')"
+  echo "$OPENCLAW_SESSION_ID"
+}
+
+format_iteration_update_message() {
+  local iteration="$1"
+  local max_iterations="$2"
+  local story_id="$3"
+  local story_title="$4"
+  local result="$5"
+  local commit="$6"
+  local summary="$7"
+
+  printf 'Iteration %s/%s\nStory: %s - %s\nResult: %s\nCommit: %s\nSummary: %s' \
+    "$iteration" "$max_iterations" "$story_id" "$story_title" "$result" "$commit" "$summary"
+}
+
+send_iteration_update() {
+  local message="$1"
+  local session_id
+
+  session_id="$(resolve_main_session_id)"
+  if [ -z "$session_id" ]; then
+    return
+  fi
+
+  set +e
+  openclaw agent --session-id "$session_id" --message "$message" --thinking off --timeout 90 >/dev/null 2>&1
+  set -e
+}
+
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
   echo "==============================================================="
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
 
-  # Run the selected tool with the ralph prompt
-  if [[ "$TOOL" == "amp" ]]; then
-    OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
-  elif [[ "$TOOL" == "claude" ]]; then
-    # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
-  else
-    # Codex CLI: run non-interactive with full permissions and emit JSONL logs per iteration
-    ITER_JSONL="$LOGS_DIR/codex-iteration-$i.jsonl"
-    ITER_LAST_MSG="$LOGS_DIR/codex-iteration-$i-last-message.txt"
-    ITER_STDERR="$LOGS_DIR/codex-iteration-$i-stderr.log"
+  ITERATION_START_HEAD="$(git rev-parse HEAD 2>/dev/null || true)"
+  TARGET_STORY_ID="$(jq -r '.userStories | map(select(.passes == false)) | sort_by(.priority) | .[0].id // "unknown"' "$PRD_FILE" 2>/dev/null || echo "unknown")"
+  TARGET_STORY_TITLE="$(jq -r '.userStories | map(select(.passes == false)) | sort_by(.priority) | .[0].title // "unknown"' "$PRD_FILE" 2>/dev/null || echo "unknown")"
+  TOOL_EXIT_STATUS=0
+  ATTEMPT_NUMBER=1
+  ATTEMPT_RESULT="failed"
+  ITERATION_MSG=""
+  OUTPUT=""
 
-    codex exec \
-      --model "$CODEX_MODEL" \
-      --dangerously-bypass-approvals-and-sandbox \
-      --json \
-      --output-last-message "$ITER_LAST_MSG" \
-      "$(cat "$SCRIPT_DIR/prompt.md")" \
-      > "$ITER_JSONL" \
-      2> >(tee /dev/stderr "$ITER_STDERR") || true
+  while true; do
+    # Run the selected tool with the ralph prompt
+    if [[ "$TOOL" == "amp" ]]; then
+      set +e
+      OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr)
+      TOOL_EXIT_STATUS=$?
+      set -e
+    elif [[ "$TOOL" == "claude" ]]; then
+      # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
+      set +e
+      OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr)
+      TOOL_EXIT_STATUS=$?
+      set -e
+    else
+      # Codex CLI: run non-interactive with full permissions and emit JSONL logs per iteration
+      ITER_JSONL="$LOGS_DIR/codex-iteration-$i.jsonl"
+      ITER_LAST_MSG="$LOGS_DIR/codex-iteration-$i-last-message.txt"
+      ITER_STDERR="$LOGS_DIR/codex-iteration-$i-stderr.log"
 
-    OUTPUT="$(cat "$ITER_LAST_MSG" 2>/dev/null || true)"
-    echo "Codex logs written: $ITER_JSONL"
-    echo "Codex last message: $ITER_LAST_MSG"
-    echo "Codex stderr log: $ITER_STDERR"
+      set +e
+      codex exec \
+        --model "$CODEX_MODEL" \
+        --dangerously-bypass-approvals-and-sandbox \
+        --json \
+        --output-last-message "$ITER_LAST_MSG" \
+        "$(cat "$SCRIPT_DIR/prompt.md")" \
+        > "$ITER_JSONL" \
+        2> >(tee /dev/stderr "$ITER_STDERR")
+      TOOL_EXIT_STATUS=$?
+      set -e
+
+      OUTPUT="$(cat "$ITER_LAST_MSG" 2>/dev/null || true)"
+      echo "Codex logs written: $ITER_JSONL"
+      echo "Codex last message: $ITER_LAST_MSG"
+      echo "Codex stderr log: $ITER_STDERR"
+    fi
+
+    ITERATION_MSG="$OUTPUT"
+    if [ -f "$LOGS_DIR/codex-iteration-$i-last-message.txt" ]; then
+      ITERATION_MSG="$(cat "$LOGS_DIR/codex-iteration-$i-last-message.txt")"
+    fi
+    ATTEMPT_RESULT="$(infer_iteration_result "$ITERATION_MSG" "$TOOL_EXIT_STATUS" "none")"
+
+    if [ "$ATTEMPT_RESULT" = "failed" ] && [ "$ATTEMPT_NUMBER" -eq 1 ]; then
+      echo "Iteration $i failed on attempt 1. Retrying once..."
+      ATTEMPT_NUMBER=2
+      continue
+    fi
+    break
+  done
+
+  ITERATION_END_HEAD="$(git rev-parse HEAD 2>/dev/null || true)"
+  ITERATION_COMMIT="none"
+  if [ -n "$ITERATION_START_HEAD" ] && [ -n "$ITERATION_END_HEAD" ] && [ "$ITERATION_START_HEAD" != "$ITERATION_END_HEAD" ]; then
+    ITERATION_COMMIT="$(git rev-parse --short "$ITERATION_END_HEAD")"
+  fi
+
+  STORY_ID="$TARGET_STORY_ID"
+  STORY_TITLE="$TARGET_STORY_TITLE"
+  if [ "$ITERATION_COMMIT" != "none" ]; then
+    LAST_COMMIT_SUBJECT="$(git log -1 --format=%s "$ITERATION_END_HEAD" 2>/dev/null || true)"
+    if echo "$LAST_COMMIT_SUBJECT" | grep -qE '^feat: \[US-[0-9]+\] - .+'; then
+      STORY_ID="$(echo "$LAST_COMMIT_SUBJECT" | sed -nE 's/^feat: \[(US-[0-9]+)\] - .+/\1/p')"
+      STORY_TITLE="$(echo "$LAST_COMMIT_SUBJECT" | sed -nE 's/^feat: \[US-[0-9]+\] - (.+)$/\1/p')"
+    fi
+  fi
+
+  if [ -z "$STORY_ID" ] || [ "$STORY_ID" = "unknown" ]; then
+    STORY_ID="$(extract_story_id_from_text "$ITERATION_MSG")"
+  fi
+  if [ -z "$STORY_ID" ]; then
+    STORY_ID="$(extract_story_id_from_progress)"
+  fi
+  if [ -z "$STORY_ID" ]; then
+    STORY_ID="unknown"
+  fi
+  if [ -z "$STORY_TITLE" ] || [ "$STORY_TITLE" = "unknown" ]; then
+    STORY_TITLE="$(extract_story_title_from_prd "$STORY_ID")"
+  fi
+  if [ -z "$STORY_TITLE" ] || [ "$STORY_TITLE" = "null" ]; then
+    STORY_TITLE="unknown"
+  fi
+
+  ITERATION_RESULT="$(infer_iteration_result "$ITERATION_MSG" "$TOOL_EXIT_STATUS" "$ITERATION_COMMIT")"
+  if [ "$ATTEMPT_NUMBER" -eq 2 ]; then
+    if [ "$ITERATION_RESULT" = "failed" ]; then
+      ITERATION_RESULT="failed (terminal after retry)"
+    else
+      ITERATION_RESULT="$ITERATION_RESULT (after retry)"
+    fi
+  fi
+  ITERATION_SUMMARY="$(extract_summary_text "$ITERATION_MSG")"
+  ITERATION_SUMMARY_FILE="$LOGS_DIR/codex-iteration-$i-summary.txt"
+  {
+    echo "Iteration: $i/$MAX_ITERATIONS"
+    echo "Story: $STORY_ID - $STORY_TITLE"
+    echo "Result: $ITERATION_RESULT"
+    echo "Commit: $ITERATION_COMMIT"
+    echo "Summary: $ITERATION_SUMMARY"
+  } > "$ITERATION_SUMMARY_FILE"
+  echo "Iteration summary written: $ITERATION_SUMMARY_FILE"
+
+  ITERATION_UPDATE_MESSAGE="$(format_iteration_update_message "$i" "$MAX_ITERATIONS" "$STORY_ID" "$STORY_TITLE" "$ITERATION_RESULT" "$ITERATION_COMMIT" "$ITERATION_SUMMARY")"
+  send_iteration_update "$ITERATION_UPDATE_MESSAGE"
+
+  if [ "$ITERATION_RESULT" = "blocked" ] || [ "$ITERATION_RESULT" = "blocked (after retry)" ]; then
+    echo ""
+    echo "Iteration $i is blocked. Stopping and waiting for user decision."
+    exit 1
+  fi
+
+  if [ "$ITERATION_RESULT" = "failed (terminal after retry)" ]; then
+    echo ""
+    echo "Iteration $i failed twice. Stopping with terminal failure."
+    exit 1
   fi
   
   # Check for completion signal

@@ -1,0 +1,36 @@
+# Ralph Progress Log
+Started: Fri Feb 20 12:50:09 UTC 2026
+## Codebase Patterns
+- For Codex runs, `ralph.sh` reads `logs/codex-iteration-<n>-last-message.txt` and writes a normalized `logs/codex-iteration-<n>-summary.txt` record.
+- Story inference is most reliable from commit subjects that follow `feat: [US-<n>] - <Story Title>`.
+- Main-session updates should use `openclaw agent --session-id` with session resolution from `openclaw sessions --json` and env overrides (`OPENCLAW_SESSION_ID`/`OPENCLAW_SESSION_KEY`).
+- For deterministic loop control, treat `failed` as retry-once within the same iteration, but treat `blocked` and second failure as stop conditions.
+---
+## [2026-02-20 12:52:40 UTC] - US-001
+Thread: https://ampcode.com/threads/unknown
+- Implemented per-iteration summary parsing/formatting in `ralph.sh`, including story extraction, result inference (`completed|blocked|failed|no-op`), commit detection, and summary file output.
+- Files changed: `ralph.sh`, `AGENTS.md`, `prd.json`, `progress.txt`.
+- **Learnings for future iterations:**
+  - The loop can infer commit creation robustly by comparing `git rev-parse HEAD` before/after each iteration.
+  - Capturing tool exit codes requires temporarily disabling `set -e` around CLI invocations.
+  - `logs/` is not gitignored in this repo, so generated artifacts should be intentionally staged or excluded.
+---
+## [2026-02-20 12:55:41 UTC] - US-002
+Thread: https://ampcode.com/threads/unknown
+- Implemented main-session iteration update delivery in `ralph.sh` by formatting per-iteration update text and sending it through the OpenClaw session path after each iteration summary is generated.
+- Files changed: `ralph.sh`, `AGENTS.md`, `prd.json`, `progress.txt`.
+- **Learnings for future iterations:**
+  - Session targeting can be resolved from `openclaw sessions --json` by preferred key (`agent:main:main`) with a latest-session fallback.
+  - Keep OpenClaw session routing overridable via env vars (`OPENCLAW_SESSION_ID`, `OPENCLAW_SESSION_KEY`) to support non-default runtime setups.
+  - Session update delivery should be best-effort so iteration loop behavior stays intact even if OpenClaw messaging is unavailable.
+---
+## [2026-02-20 12:58:17 UTC] - US-003
+Thread: https://ampcode.com/threads/unknown
+- Implemented deterministic blocked/failure control flow in `ralph.sh`: failed attempts retry once within the same iteration, blocked outcomes stop immediately, and second failures stop as terminal failures.
+- Updated iteration result labeling to include retry status (`... (after retry)` or `failed (terminal after retry)`) so update messages capture retry/terminal state.
+- Files changed: `ralph.sh`, `AGENTS.md`, `prd.json`, `progress.txt`.
+- **Learnings for future iterations:**
+  - Keep retry policy scoped to the current iteration number so logs and summary files remain one-record-per-iteration.
+  - Derive stop/continue behavior from normalized iteration result strings after summary generation to keep reporting and control flow aligned.
+  - Preserve completion signaling (`<promise>COMPLETE</promise>`) after outcome handling so successful terminal exits still behave as before.
+---

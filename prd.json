@@ -1,0 +1,53 @@
+{
+  "project": "Ralph",
+  "branchName": "ralph/iteration-session-summary-reporting",
+  "description": "Enhance Ralph dev flow to emit concise per-iteration updates to main agent session using Codex iteration outputs.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Per-iteration summary parser and formatter",
+      "description": "As an operator, I need each iteration to produce a concise structured summary sourced from Codex output files.",
+      "acceptanceCriteria": [
+        "Read logs/codex-iteration-<n>-last-message.txt after each iteration",
+        "Extract story id/title when available from last message or progress context",
+        "Infer result as completed|blocked|failed|no-op",
+        "Include commit hash when created, otherwise none",
+        "Format summary with fields: Iteration, Story, Result, Commit, Summary",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Enhance existing flow; do not redesign log format."
+    },
+    {
+      "id": "US-002",
+      "title": "Main-session iteration update delivery",
+      "description": "As an operator, I need iteration summaries sent to the main OpenClaw session after each iteration.",
+      "acceptanceCriteria": [
+        "After each iteration completes, send one concise update message to main session",
+        "Message includes Iteration n/N, Story, Result, Commit, Summary",
+        "Updates are sent for success and blocked/failed outcomes",
+        "Existing ralph.sh completion behavior remains intact",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Use OpenClaw session messaging path; keep implementation incremental."
+    },
+    {
+      "id": "US-003",
+      "title": "Blocked and retry-once failure policy",
+      "description": "As an operator, I need deterministic handling for blocked and failed iterations.",
+      "acceptanceCriteria": [
+        "Blocked outcome stops loop and requests user decision",
+        "Failed outcome retries same iteration exactly once",
+        "Second failure reports terminal failure and stops loop",
+        "Retry/terminal status is reflected in iteration update message",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Enhance control flow only; keep existing loop structure where possible."
+    }
+  ]
+}
