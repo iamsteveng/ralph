@@ -45,3 +45,4 @@ npm run dev
 - Memory persists via git history, `progress.txt`, and `prd.json`
 - Stories should be small enough to complete in one context window
 - Always update AGENTS.md with discovered patterns for future iterations
+- Codex iterations now emit `logs/codex-iteration-<n>-summary.txt` with `Iteration`, `Story`, `Result`, `Commit`, and `Summary` fields for downstream reporting
