@@ -1,98 +1,95 @@
-# PRD: Ralph Iteration Session Orchestration + Per-Iteration Summary Reporting
+# PRD: Ralph Iteration Update Messaging (Enhancement)
 
-## 1. Introduction/Overview
+## 1) Overview
 
-Enhance the Ralph development skill so each iteration runs in a separate isolated OpenClaw agent session (sequentially), and after each iteration completes, a concise Codex-derived summary is sent to the main agent session.
+This is an **enhancement PRD**, not a ground-up redesign.
 
-This improves observability, makes iteration outcomes explicit, and allows safer stop/retry behavior without losing control of long-running loops.
+Ralph already runs iterative loops and already produces per-iteration Codex artifacts:
+- `logs/codex-iteration-<n>.jsonl`
+- `logs/codex-iteration-<n>-last-message.txt`
+- `logs/codex-iteration-<n>-stderr.log`
 
-## 2. Goals
+The gap is that iteration progress is only visible in local logs/console. We need reliable, concise per-iteration updates sent to the main OpenClaw agent session.
 
-- Run Ralph iterations one-at-a-time in isolated sessions.
-- Send an immediate summary message to the main agent after every iteration.
-- Standardize summary content so progress is easy to parse.
-- Support stop/retry policy: stop on blocked, retry once on failed, then continue policy-defined flow.
-- Keep default behavior deterministic and traceable.
+## 2) Current State in Repo
 
-## 3. User Stories
+From current `ralph.sh` behavior:
+- Supports iterative execution with bounded `MAX_ITERATIONS`.
+- Emits per-iteration logs and a last-message summary file.
+- Detects completion via `<promise>COMPLETE</promise>`.
+- Does **not** send per-iteration status back to main session.
 
-### US-001: Isolated session per iteration
-**Description:** As an operator, I want each Ralph iteration to run in its own isolated agent session so failures are contained and progress is auditable.
+## 3) Goal
 
-**Acceptance Criteria:**
-- [ ] Iterations run sequentially, exactly one worker session per iteration.
-- [ ] Worker session executes a single iteration against active `prd.json`.
-- [ ] Main orchestration loop tracks `current_iteration` and `max_iterations`.
-- [ ] Iteration completion status is returned to the orchestrator.
+Add minimal orchestration enhancements so that after each iteration finishes, the main agent receives a concise operational summary sourced from Codex output.
 
-### US-002: Per-iteration summary message to main session
-**Description:** As an operator, I want a concise summary message after each iteration so I can monitor progress without reading raw logs.
+## 4) Scope (Enhancement Only)
 
-**Acceptance Criteria:**
-- [ ] After each iteration, orchestrator reads `logs/codex-iteration-<n>-last-message.txt` as primary summary source.
-- [ ] Orchestrator sends one message to main session after each iteration.
-- [ ] Message includes: iteration `n/N`, story attempted, result, commit hash, and short summary text.
-- [ ] Message format remains concise and consistent.
+In scope:
+- One-iteration worker session pattern (sequential).
+- Per-iteration summary message to main session.
+- Stop on blocked; retry once on failed.
 
-### US-003: Failure/blocked handling policy
-**Description:** As an operator, I want predictable loop behavior when an iteration blocks or fails.
+Out of scope:
+- Rewriting Ralph loop from scratch.
+- Replacing existing log format.
+- Parallel execution.
+- Auto-merge behavior.
 
-**Acceptance Criteria:**
-- [ ] If result is **blocked**, loop stops and requests user decision.
-- [ ] If result is **failed**, system retries that iteration once.
-- [ ] If retry also fails, status is reported and loop follows configured continue/stop policy.
-- [ ] Blocked/failed outcomes are included in iteration summary message.
+## 5) User Stories
 
-### US-004: Completion handling
-**Description:** As an operator, I want clean end-of-run behavior once work is complete or limit is reached.
+### US-001: Per-iteration main-session update
+**Description:** As an operator, I want one update after each iteration so I can monitor progress without tailing logs.
 
 **Acceptance Criteria:**
-- [ ] Loop stops when all stories are `passes: true`, max iterations reached, or user stops.
-- [ ] Final summary includes completed stories, remaining stories, and produced commits.
-- [ ] Final summary is sent to main session.
+- [ ] After each iteration, system reads `logs/codex-iteration-<n>-last-message.txt`.
+- [ ] Sends one concise message to main session.
+- [ ] Message includes: `Iteration n/N`, `Story`, `Result`, `Commit`, `Summary`.
+- [ ] Message is sent even when result is blocked/failed.
 
-## 4. Functional Requirements
+### US-002: Sequential worker-session orchestration
+**Description:** As an operator, I want each iteration executed in an isolated worker session, sequentially.
 
-- **FR-1:** Orchestrator must spawn one isolated OpenClaw worker session per iteration.
-- **FR-2:** Iterations must execute sequentially (no parallel execution by default).
-- **FR-3:** Worker must run one iteration and return structured outcome fields (`story`, `result`, `commit`, `summary`).
-- **FR-4:** After each iteration, orchestrator must send a summary to main session (`sessions_send`).
-- **FR-5:** Summary source priority must be:
-  1. `logs/codex-iteration-<n>-last-message.txt`
-  2. fallback to iteration JSONL/log parsing when needed.
-- **FR-6:** On blocked result, orchestrator must stop and request explicit user input.
-- **FR-7:** On failed result, orchestrator must retry once before finalizing failure outcome.
-- **FR-8:** Orchestrator must preserve iteration index and attempt count for reporting.
+**Acceptance Criteria:**
+- [ ] Exactly one worker session is used per iteration.
+- [ ] Iterations run in sequence (no overlap).
+- [ ] Main loop tracks iteration index and total.
+- [ ] Worker returns structured outcome to orchestrator.
 
-## 5. Non-Goals (Out of Scope)
+### US-003: Failure policy (blocked + retry-once)
+**Description:** As an operator, I want deterministic behavior for blocked/failed outcomes.
 
-- Posting per-iteration updates directly to external chat channels.
-- Parallel iteration execution.
-- Automatic PR merge behavior.
-- Redesigning Ralph’s PRD schema.
+**Acceptance Criteria:**
+- [ ] `blocked` stops the loop and requests user decision.
+- [ ] `failed` retries the same iteration exactly once.
+- [ ] If retry fails again, report terminal failure and stop.
+- [ ] Summary messages clearly indicate original fail vs retry fail.
 
-## 6. Design Considerations
+## 6) Functional Requirements
 
-- Use a strict summary template for consistent parsing by humans and tools.
-- Keep message payload short to avoid noisy updates.
-- Preserve compatibility with existing Ralph logs and branch workflow.
+- **FR-1:** Keep existing Ralph log outputs unchanged.
+- **FR-2:** Use `codex-iteration-<n>-last-message.txt` as primary summary source.
+- **FR-3:** Send per-iteration update to main OpenClaw session via session messaging.
+- **FR-4:** Use concise fixed message format for easy scanning.
+- **FR-5:** Enforce sequential execution with one worker session per iteration.
+- **FR-6:** Enforce policy: blocked => stop; failed => retry once => stop on second fail.
 
-## 7. Technical Considerations
+## 7) Message Format (Required)
 
-- Use OpenClaw session orchestration primitives for spawn/send/monitor.
-- Ensure orchestration logic handles missing log files gracefully.
-- Add clear result taxonomy: `completed`, `blocked`, `failed`, `no-op`.
-- Maintain deterministic retry semantics (max one retry for failed iteration).
+- `Iteration n/N`
+- `Story: US-### - <title|unknown>`
+- `Result: completed | blocked | failed | no-op`
+- `Commit: <hash|none>`
+- `Summary: <1-3 lines from Codex last message>`
 
-## 8. Success Metrics
+## 8) Success Criteria
 
-- 100% of iterations produce one summary message to main session.
-- 100% of blocked iterations stop and request user decision.
-- Failed iterations are retried exactly once in all retry scenarios.
-- Operators can identify iteration outcome in under 10 seconds from message content.
+- 100% of completed iterations produce one update to main session.
+- 100% of blocked iterations stop immediately after reporting.
+- Failed iterations are retried once, with both attempts visible in updates.
+- No regressions to existing Ralph log generation.
 
-## 9. Open Questions
+## 9) Open Questions
 
-- If first failure and retry both fail, should default behavior be stop or continue to next story?
-- Should retry delay/backoff be fixed or configurable?
-- Should summary include changed files by default or only when commit exists?
+- Should unknown story IDs be inferred from latest commit/progress text or shown as `unknown`?
+- Should retry attempts be shown as `Iteration 2/5 (retry 1)` or separate label field?
