@@ -3,6 +3,7 @@
 - `flowchart` lint includes `react-hooks/refs`; avoid `ref.current` reads during render-time initialization and use non-ref constants for initial state.
 - `skills/qa-plan-generator/SKILL.md` uses mutually exclusive generation modes; when using free-text objectives, enforce one of the six objective types and deterministic output naming `test-plan-objective-<objective-type>-<slug>.md`.
 - `skills/qa-plan-json/SKILL.md` should keep strict schema/versioning (`qaPlanSchemaVersion: 1.0.0`) and emit fail-fast validation messages with source-line references using `E-<code> [line <n>] ...` format.
+- `qa-codex-loop.sh` is the QA execution entrypoint; it enforces `qaPlanSchemaVersion: 1.0.0`, executes tests in sorted `TC-###` order, and only marks PASS when tool exit is zero and output includes `<status>PASS</status>`.
 
 Started: Fri Feb 27 08:44:00 UTC 2026
 ---
@@ -36,4 +37,14 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - QA converter outputs should remain stable by preserving Scenario Matrix row order and deterministic `TC-###` IDs when constructing JSON `tests`.
   - Validation should fail fast with explicit source line references to make downstream debugging and executor ingestion deterministic.
   - Keep handoff explicit: successful converter output path feeds directly into the loop executor skill.
+---
+## 2026-02-27 08:54:48 UTC - US-004
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Added `qa-codex-loop` execution skill documentation with explicit baseline reuse analysis from `ralph.sh` and a gap analysis for JSON-plan QA execution needs.
+- Implemented `qa-codex-loop.sh` executor entrypoint supporting explicit `--tool codex|claude-code`, deterministic test ordering by `TC-###`, per-test result capture, aggregate run summary, and machine-readable gate status via `status.txt` (`PASS`/`FAIL`).
+- Files changed: `skills/qa-codex-loop/SKILL.md`, `qa-codex-loop.sh`, `AGENTS.md`, `prd.json`, `progress.txt`.
+- **Learnings for future iterations:**
+  - QA gate semantics are strict in this repo: aggregate PASS requires every test result to be PASS, and test-level PASS requires both successful tool execution and explicit `<status>PASS</status>` output.
+  - Keep QA run artifacts under `logs/qa-loop/<run-id>/` with both per-test and aggregate files to preserve deterministic debugging context.
+  - Skill handoff for QA should remain linear: generator (`.md`) -> converter (`.json`) -> executor (`qa-codex-loop`).
 ---
