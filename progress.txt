@@ -4,6 +4,7 @@
 - `skills/qa-plan-generator/SKILL.md` uses mutually exclusive generation modes; when using free-text objectives, enforce one of the six objective types and deterministic output naming `test-plan-objective-<objective-type>-<slug>.md`.
 - `skills/qa-plan-json/SKILL.md` should keep strict schema/versioning (`qaPlanSchemaVersion: 1.0.0`) and emit fail-fast validation messages with source-line references using `E-<code> [line <n>] ...` format.
 - `qa-codex-loop.sh` is the QA execution entrypoint; it enforces `qaPlanSchemaVersion: 1.0.0`, executes tests in sorted `TC-###` order, and only marks PASS when tool exit is zero and output includes `<status>PASS</status>`.
+- `qa-codex-loop.sh` remediation mode is bounded and deterministic: run a full gate first, then for each loop run patch attempt -> rerun failed tests -> rerun full gate, with stop controls (`maxLoops`, optional `maxDuration`, optional `maxPatchCount`) and terminal diagnostics in `summary.json` + `unresolved.json`.
 
 Started: Fri Feb 27 08:44:00 UTC 2026
 ---
@@ -47,4 +48,15 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - QA gate semantics are strict in this repo: aggregate PASS requires every test result to be PASS, and test-level PASS requires both successful tool execution and explicit `<status>PASS</status>` output.
   - Keep QA run artifacts under `logs/qa-loop/<run-id>/` with both per-test and aggregate files to preserve deterministic debugging context.
   - Skill handoff for QA should remain linear: generator (`.md`) -> converter (`.json`) -> executor (`qa-codex-loop`).
+---
+## 2026-02-27 08:59:36 UTC - US-005
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Implemented bounded self-healing in `qa-codex-loop.sh`: after initial full gate failures, the executor now runs remediation loops that perform diagnose/patch, rerun affected failed tests, then rerun the full gate.
+- Added loop controls `--max-loops`, `--max-duration`, and `--max-patch-count`, plus terminal failure reporting with `stopReason`, unresolved failures, and last root causes in run artifacts.
+- Updated `skills/qa-codex-loop/SKILL.md` to document the remediation contract, new CLI options, and additional artifacts (`attempts/`, `remediation/`, `unresolved.json`).
+- Files changed: `qa-codex-loop.sh`, `skills/qa-codex-loop/SKILL.md`, `AGENTS.md`, `prd.json`, `progress.txt`.
+- **Learnings for future iterations:**
+  - Keep QA gate semantics tied to full-suite status; failed-test reruns are only an intermediate signal before required full-gate validation.
+  - Persist remediation diagnostics in machine-readable files (`summary.json` + `unresolved.json`) so downstream loops can surface exact unresolved IDs and root causes.
+  - Bound self-healing loops with explicit controls to avoid unbounded patch churn in autonomous execution.
 ---

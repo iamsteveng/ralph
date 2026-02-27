@@ -1,6 +1,6 @@
 ---
 name: qa-codex-loop
-description: "Execute a QA JSON plan deterministically with explicit tool choice (codex or claude-code), capture per-test outcomes, and emit machine-readable PASS/FAIL artifacts."
+description: "Execute a QA JSON plan deterministically with explicit tool choice (codex or claude-code), run bounded remediation loops, and emit machine-readable PASS/FAIL artifacts."
 user-invocable: true
 ---
 
@@ -47,6 +47,7 @@ Missing behaviors in `ralph.sh` for QA:
 3. Execute all tests in deterministic `TC-###` order
 4. Persist per-test artifacts and consolidated run summary
 5. Emit machine-readable gate status (`PASS`/`FAIL`)
+6. On failures, run bounded self-healing loops (diagnose, patch, rerun failed tests, rerun full gate)
 
 ---
 
@@ -60,6 +61,9 @@ Required inputs:
 Optional input:
 
 - `--logs-dir <path>`: defaults to `logs/qa-loop`
+- `--max-loops <n>`: remediation loop limit after initial full run (default `3`)
+- `--max-duration <seconds>`: optional wall-clock limit across full run (default `0`, disabled)
+- `--max-patch-count <n>`: optional remediation attempt limit (default `0`, disabled)
 
 Schema expectations:
 
@@ -85,6 +89,12 @@ Claude Code variant:
 ./qa-codex-loop.sh --plan tasks/test-plan-foo.json --tool claude-code
 ```
 
+Bounded remediation example:
+
+```bash
+./qa-codex-loop.sh --plan tasks/test-plan-foo.json --tool codex --max-loops 4 --max-duration 1800 --max-patch-count 6
+```
+
 The script will:
 
 1. Validate input arguments and schema version
@@ -98,10 +108,12 @@ The script will:
 ## Deterministic Execution Rules
 
 1. Sort test cases by numeric ID from `TC-###`
-2. Run each test exactly once per pass (no remediation loop here)
+2. Initial execution is a full gate pass over all tests
 3. A test is `PASS` only when tool exit code is zero and output contains `<status>PASS</status>`
 4. Any other condition is `FAIL`
-5. Final gate status is `PASS` only when all tests pass
+5. If failures exist, remediation loop is: diagnose/patch -> rerun affected failed tests -> rerun full gate
+6. Final gate status is `PASS` only when the latest full gate run has no failures
+7. Stop with `FAIL` when any configured loop control is reached before a full pass
 
 ---
 
@@ -114,6 +126,7 @@ Per run (`logs/qa-loop/<run-id>/`):
 - `outcomes.jsonl` - one JSON record per test
 - `summary.json` - aggregate totals and final status
 - `status.txt` - exact string `PASS` or `FAIL`
+- `unresolved.json` - unresolved failed tests with last known reasons when final status is `FAIL`
 
 Per test (`logs/qa-loop/<run-id>/tests/<test-id>/`):
 
@@ -122,6 +135,20 @@ Per test (`logs/qa-loop/<run-id>/tests/<test-id>/`):
 - `stderr.log` - stderr stream
 - `result.json` - normalized outcome metadata
 - `status.txt` - test-level status
+
+Per attempt (`logs/qa-loop/<run-id>/attempts/<label>/`):
+
+- `outcomes.jsonl` - per-attempt normalized test outcomes
+- `summary.json` - per-attempt totals and status
+- `tests/<test-id>/...` - attempt-scoped per-test artifacts
+
+Per remediation loop (`logs/qa-loop/<run-id>/remediation/loop-XX/`):
+
+- `prompt.md` - remediation prompt
+- `agent-output.txt` - tool output from remediation attempt
+- `stderr.log` - stderr from remediation attempt
+- `status.txt` - `PATCHED` or `BLOCKED`
+- `root-causes.json` - parsed root-cause items from remediation output
 
 ---
 
@@ -133,6 +160,10 @@ Per test (`logs/qa-loop/<run-id>/tests/<test-id>/`):
 - script exit code:
   - `0` when `PASS`
   - `1` when `FAIL` or validation error
+- `summary.json` includes remediation metadata:
+  - `stopReason` (`all_tests_passed`, `max_loops_reached`, `max_duration_reached`, `max_patch_count_reached`)
+  - loop and patch counters
+  - unresolved failures and last extracted root causes
 
 ---
 
@@ -154,5 +185,7 @@ Before returning execution result:
 - [ ] Documented gap analysis for JSON-plan QA needs
 - [ ] Tool choice is explicit (`codex` or `claude-code`)
 - [ ] Tests executed in deterministic order
+- [ ] Self-healing loop follows: diagnose/patch, rerun affected tests, rerun full gate
+- [ ] Loop controls are enforced (`max-loops`, optional `max-duration`, optional `max-patch-count`)
 - [ ] Per-test outcomes and aggregate summary are written
 - [ ] Machine-readable `PASS`/`FAIL` status emitted
