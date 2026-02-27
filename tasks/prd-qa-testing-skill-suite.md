@@ -47,10 +47,11 @@ Primary outcome: **faster release confidence via pre-merge quality gating**.
 **Description:** As an automation pipeline, I want to convert test plan markdown into a strict JSON schema so that downstream executors can run the plan deterministically.
 
 **Acceptance Criteria:**
+- [ ] Before conversion logic is finalized, review `skills/ralph/SKILL.md` and document the converter pattern to mirror (conversion rules, ordering discipline, and validation expectations)
 - [ ] Skill accepts test plan `.md` input
-- [ ] Skill outputs valid JSON conforming to documented schema version
-- [ ] JSON includes test IDs, steps, commands, pass/fail criteria, retry rules, and evidence fields
-- [ ] Validation errors are surfaced with actionable messages and line references
+- [ ] Skill outputs valid JSON conforming to a documented and versioned schema
+- [ ] JSON includes deterministic test IDs, steps, commands, pass/fail criteria, retry rules, and evidence fields
+- [ ] Validation errors are surfaced with actionable messages and source line references
 
 ### US-004: Execute JSON plan with model/tool choice
 **Description:** As a release engineer, I want to run the JSON plan with either Codex or Claude Code so that execution uses the best agent for the task.
@@ -89,7 +90,7 @@ Primary outcome: **faster release confidence via pre-merge quality gating**.
 - **FR-1:** Provide Skill 1 (`qa-plan-generator`) that first mirrors the documented structure conventions from `skills/prd/SKILL.md`, then accepts either PRD markdown input or free-text testing objective input.
 - **FR-2:** Skill 1 must generate a standardized `test-plan-*.md` containing scope, risk areas, test matrix, commands, pass criteria, and evidence expectations.
 - **FR-3:** Skill 1 must support objective categories: acceptance, bug, test gap, flaky, refactor for testability, performance.
-- **FR-4:** Provide Skill 2 (`qa-plan-json`) to parse test plan markdown and emit `test-plan-*.json` in strict schema.
+- **FR-4:** Provide Skill 2 (`qa-plan-json`) that mirrors `skills/ralph/SKILL.md` converter discipline, parsing test plan markdown and emitting `test-plan-*.json` in a strict, versioned schema.
 - **FR-5:** Skill 2 must validate schema and fail fast on malformed or incomplete plans.
 - **FR-6:** Provide Skill 3 (`qa-codex-loop`) and script entrypoint to execute JSON plan using explicit tool choice (`codex` or `claude-code`).
 - **FR-7:** Skill 3 must implement strict gate semantics: success only when all required tests pass.
