@@ -2,6 +2,7 @@
 ## Codebase Patterns
 - `flowchart` lint includes `react-hooks/refs`; avoid `ref.current` reads during render-time initialization and use non-ref constants for initial state.
 - `skills/qa-plan-generator/SKILL.md` uses mutually exclusive generation modes; when using free-text objectives, enforce one of the six objective types and deterministic output naming `test-plan-objective-<objective-type>-<slug>.md`.
+- `skills/qa-plan-json/SKILL.md` should keep strict schema/versioning (`qaPlanSchemaVersion: 1.0.0`) and emit fail-fast validation messages with source-line references using `E-<code> [line <n>] ...` format.
 
 Started: Fri Feb 27 08:44:00 UTC 2026
 ---
@@ -23,5 +24,16 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
 - **Learnings for future iterations:**
   - Keep `qa-plan-generator` deterministic across both inputs by making mode selection exclusive and explicit before scenario generation.
   - Objective-mode plans should still follow the same section order as PRD mode and append only objective-specific strategy details.
-  - Deterministic filenames for free-text inputs need both normalized objective type and a stable slug from objective text.
+- Deterministic filenames for free-text inputs need both normalized objective type and a stable slug from objective text.
+---
+## 2026-02-27 08:51:42 UTC - US-003
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Added new converter skill at `skills/qa-plan-json/SKILL.md` that mirrors `skills/ralph` converter pattern with explicit conversion rules, ordering discipline, and strict validation expectations.
+- Documented a versioned executable schema (`qaPlanSchemaVersion: 1.0.0`) covering deterministic test IDs, steps, commands, pass/fail criteria, retry rules, evidence fields, and source-to-JSON mapping.
+- Defined actionable validation error contract with source line references and fix guidance for malformed/missing sections, invalid IDs/enums, and incomplete automated test commands.
+- Files changed: `skills/qa-plan-json/SKILL.md`, `AGENTS.md`, `prd.json`, `progress.txt`.
+- **Learnings for future iterations:**
+  - QA converter outputs should remain stable by preserving Scenario Matrix row order and deterministic `TC-###` IDs when constructing JSON `tests`.
+  - Validation should fail fast with explicit source line references to make downstream debugging and executor ingestion deterministic.
+  - Keep handoff explicit: successful converter output path feeds directly into the loop executor skill.
 ---

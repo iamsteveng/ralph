@@ -50,3 +50,4 @@ npm run dev
 - Iteration failure handling is deterministic: retry a `failed` outcome exactly once in the same iteration, but stop immediately on `blocked` or terminal retry failure
 - In `flowchart/src/App.tsx`, avoid reading `useRef().current` from render-time initialization paths; `eslint` enforces `react-hooks/refs` and fails on ref access during render.
 - `skills/qa-plan-generator/SKILL.md` supports two exclusive input modes (PRD path or free-text objective); objective mode must normalize to one allowed objective type and use deterministic filename `test-plan-objective-<objective-type>-<slug>.md`.
+- `skills/qa-plan-json/SKILL.md` defines a strict, versioned converter contract (`qaPlanSchemaVersion: 1.0.0`); keep Scenario Matrix column mapping deterministic and require actionable validation errors in format `E-<code> [line <n>] <message> :: <fix guidance>`.
