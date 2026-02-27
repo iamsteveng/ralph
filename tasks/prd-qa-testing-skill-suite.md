@@ -28,9 +28,10 @@ Primary outcome: **faster release confidence via pre-merge quality gating**.
 **Description:** As a QA engineer, I want to provide a PRD markdown file and receive a complete test plan markdown so that I can quickly move from feature intent to test coverage.
 
 **Acceptance Criteria:**
+- [ ] Before generation logic is finalized, review `skills/prd/SKILL.md` and document its structure pattern (sections, flow, and output conventions) as a reference for this skill
 - [ ] Skill accepts a PRD `.md` file path input
 - [ ] Skill extracts requirements/user stories and maps them to test scenarios
-- [ ] Skill outputs a test plan markdown file with deterministic section structure
+- [ ] Skill outputs a test plan markdown file with deterministic section structure aligned to the documented pattern
 - [ ] Skill validates missing/ambiguous requirements and records assumptions
 
 ### US-002: Generate test plan from test objective text
@@ -85,7 +86,7 @@ Primary outcome: **faster release confidence via pre-merge quality gating**.
 
 ## 4) Functional Requirements
 
-- **FR-1:** Provide Skill 1 (`qa-plan-generator`) that accepts either PRD markdown input or free-text testing objective input.
+- **FR-1:** Provide Skill 1 (`qa-plan-generator`) that first mirrors the documented structure conventions from `skills/prd/SKILL.md`, then accepts either PRD markdown input or free-text testing objective input.
 - **FR-2:** Skill 1 must generate a standardized `test-plan-*.md` containing scope, risk areas, test matrix, commands, pass criteria, and evidence expectations.
 - **FR-3:** Skill 1 must support objective categories: acceptance, bug, test gap, flaky, refactor for testability, performance.
 - **FR-4:** Provide Skill 2 (`qa-plan-json`) to parse test plan markdown and emit `test-plan-*.json` in strict schema.
