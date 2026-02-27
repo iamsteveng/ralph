@@ -1,53 +1,101 @@
 {
   "project": "Ralph",
-  "branchName": "ralph/iteration-session-summary-reporting",
-  "description": "Enhance Ralph dev flow to emit concise per-iteration updates to main agent session using Codex iteration outputs.",
+  "branchName": "ralph/add-codex-loop-skill-copy",
+  "description": "Implement the QA Testing Skill Suite PRD in one-story increments, reusing Ralph patterns for generation, conversion, and execution.",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Per-iteration summary parser and formatter",
-      "description": "As an operator, I need each iteration to produce a concise structured summary sourced from Codex output files.",
+      "title": "Generate test plan from PRD file",
+      "description": "As a QA engineer, I want to provide a PRD markdown file and receive a complete test plan markdown so that I can quickly move from feature intent to test coverage.",
       "acceptanceCriteria": [
-        "Read logs/codex-iteration-<n>-last-message.txt after each iteration",
-        "Extract story id/title when available from last message or progress context",
-        "Infer result as completed|blocked|failed|no-op",
-        "Include commit hash when created, otherwise none",
-        "Format summary with fields: Iteration, Story, Result, Commit, Summary",
+        "Document structure pattern from skills/prd/SKILL.md (sections, flow, output conventions)",
+        "Accept PRD .md file path input",
+        "Map requirements/user stories to test scenarios",
+        "Output deterministic test-plan-*.md aligned to documented pattern",
+        "Validate missing/ambiguous requirements and record assumptions",
         "Typecheck passes"
       ],
       "priority": 1,
       "passes": true,
-      "notes": "Enhance existing flow; do not redesign log format."
+      "notes": "Skill 1"
     },
     {
       "id": "US-002",
-      "title": "Main-session iteration update delivery",
-      "description": "As an operator, I need iteration summaries sent to the main OpenClaw session after each iteration.",
+      "title": "Generate test plan from free-text objective",
+      "description": "As a developer, I want to provide a free-text testing objective and receive a structured test plan markdown so that ad-hoc quality work is standardized.",
       "acceptanceCriteria": [
-        "After each iteration completes, send one concise update message to main session",
-        "Message includes Iteration n/N, Story, Result, Commit, Summary",
-        "Updates are sent for success and blocked/failed outcomes",
-        "Existing ralph.sh completion behavior remains intact",
+        "Accept free-text objective input",
+        "Support objective types: acceptance, bug, test gap, flaky, refactor for testability, performance",
+        "Include objective-specific strategy templates in generated output",
+        "Write markdown output to predictable file path",
         "Typecheck passes"
       ],
       "priority": 2,
       "passes": true,
-      "notes": "Use OpenClaw session messaging path; keep implementation incremental."
+      "notes": "Skill 1 extension"
     },
     {
       "id": "US-003",
-      "title": "Blocked and retry-once failure policy",
-      "description": "As an operator, I need deterministic handling for blocked and failed iterations.",
+      "title": "Convert test plan markdown to executable JSON",
+      "description": "As an automation pipeline, I want to convert test plan markdown into a strict JSON schema so that downstream executors can run the plan deterministically.",
       "acceptanceCriteria": [
-        "Blocked outcome stops loop and requests user decision",
-        "Failed outcome retries same iteration exactly once",
-        "Second failure reports terminal failure and stops loop",
-        "Retry/terminal status is reflected in iteration update message",
+        "Document converter pattern mirrored from skills/ralph/SKILL.md",
+        "Accept test plan .md input",
+        "Emit valid JSON in documented, versioned schema",
+        "Include deterministic test IDs, steps, commands, pass/fail criteria, retry rules, and evidence fields",
+        "Surface actionable validation errors with source line references",
         "Typecheck passes"
       ],
       "priority": 3,
       "passes": true,
-      "notes": "Enhance control flow only; keep existing loop structure where possible."
+      "notes": "Skill 2"
+    },
+    {
+      "id": "US-004",
+      "title": "Execute JSON plan with tool choice",
+      "description": "As a release engineer, I want to run the JSON plan with either Codex or Claude Code so that execution uses the best agent for the task.",
+      "acceptanceCriteria": [
+        "Document ralph.sh baseline analysis and reusable components",
+        "Document gap analysis between ralph.sh and QA executor needs",
+        "Support explicit tool choice per run (codex or claude-code)",
+        "Read JSON plan and run test items in deterministic order",
+        "Store logs, per-test outcomes, and aggregate summary",
+        "Exit with machine-readable PASS/FAIL",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "Skill 3"
+    },
+    {
+      "id": "US-005",
+      "title": "Iterative self-healing gate until all tests pass",
+      "description": "As a team lead, I want the executor to keep fixing and re-running until all tests pass (bounded by max loops/time) so that quality gates are reliable.",
+      "acceptanceCriteria": [
+        "On failure run loop: diagnose, patch, rerun affected tests, rerun full gate",
+        "Gate passes only when all required tests pass",
+        "Loop controls: maxLoops, optional maxDuration, optional maxPatchCount",
+        "On loop-limit failure, exit FAIL with unresolved items and last root causes",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "Loop semantics"
+    },
+    {
+      "id": "US-006",
+      "title": "Align QA skills with Ralph architecture pattern",
+      "description": "As a maintainer, I want QA skills to mirror Ralph conventions so that onboarding and maintenance are consistent.",
+      "acceptanceCriteria": [
+        "Align skill layout and command conventions with Ralph 3-skill pattern",
+        "Document handoffs between skill 1, skill 2, and skill 3",
+        "Mirror Ralph entrypoint and log ergonomics",
+        "Implement naming: qa-plan-generator, qa-plan-json, qa-codex-loop",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "Architecture alignment"
     }
   ]
 }

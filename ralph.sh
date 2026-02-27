@@ -121,8 +121,9 @@ infer_iteration_result() {
   local tool_exit_status="$2"
   local commit_hash="$3"
 
-  if echo "$text" | grep -qiE '\b(blocked|cannot proceed|need user input|waiting on|requires decision)\b'; then
-    echo "blocked"
+  # A real commit means the iteration made forward progress.
+  if [ "$commit_hash" != "none" ]; then
+    echo "completed"
     return
   fi
 
@@ -131,8 +132,9 @@ infer_iteration_result() {
     return
   fi
 
-  if [ "$commit_hash" != "none" ]; then
-    echo "completed"
+  # Avoid false positives from domain text like "user blocked" in app behavior descriptions.
+  if echo "$text" | grep -qiE '\b(cannot proceed|needs? user input|waiting on|requires decision|blocked by)\b'; then
+    echo "blocked"
     return
   fi
 
@@ -179,9 +181,8 @@ send_iteration_update() {
     return
   fi
 
-  set +e
-  openclaw agent --session-id "$session_id" --message "$message" --thinking off --timeout 90 >/dev/null 2>&1
-  set -e
+  # Fire-and-forget to avoid deadlocking when Ralph is invoked from an active agent turn.
+  (openclaw agent --session-id "$session_id" --message "$message" --thinking off --timeout 90 >/dev/null 2>&1 &) || true
 }
 
 for i in $(seq 1 $MAX_ITERATIONS); do
