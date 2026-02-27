@@ -1,6 +1,7 @@
 # Ralph Progress Log
 ## Codebase Patterns
 - `flowchart` lint includes `react-hooks/refs`; avoid `ref.current` reads during render-time initialization and use non-ref constants for initial state.
+- `skills/qa-plan-generator/SKILL.md` uses mutually exclusive generation modes; when using free-text objectives, enforce one of the six objective types and deterministic output naming `test-plan-objective-<objective-type>-<slug>.md`.
 
 Started: Fri Feb 27 08:44:00 UTC 2026
 ---
@@ -12,4 +13,15 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - The QA skill implementation pattern in this repo is documentation-first (`SKILL.md`) with explicit input contract, step flow, output convention, and checklist sections.
   - `flowchart` lint can fail due to `react-hooks/refs` even when build/typecheck pass; keep render-time initialization independent from refs.
   - When adding new skills, place them in `skills/<skill-name>/SKILL.md` and keep structure aligned with existing `skills/prd` and `skills/ralph`.
+---
+## 2026-02-27 08:48:56 UTC - US-002
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Extended `skills/qa-plan-generator/SKILL.md` to accept free-text testing objectives in addition to PRD input, with explicit mode selection and objective-type handling.
+- Added objective-specific strategy templates for acceptance, bug, test-gap, flaky, refactor-for-testability, and performance planning modes.
+- Enforced predictable objective-mode output naming via `test-plan-objective-<objective-type>-<slug>.md`.
+- Files changed: `skills/qa-plan-generator/SKILL.md`, `AGENTS.md`, `prd.json`, `progress.txt`.
+- **Learnings for future iterations:**
+  - Keep `qa-plan-generator` deterministic across both inputs by making mode selection exclusive and explicit before scenario generation.
+  - Objective-mode plans should still follow the same section order as PRD mode and append only objective-specific strategy details.
+  - Deterministic filenames for free-text inputs need both normalized objective type and a stable slug from objective text.
 ---

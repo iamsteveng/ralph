@@ -49,3 +49,4 @@ npm run dev
 - Iteration updates to the main OpenClaw session are sent via `openclaw agent --session-id`; `OPENCLAW_SESSION_ID` and `OPENCLAW_SESSION_KEY` can override session targeting
 - Iteration failure handling is deterministic: retry a `failed` outcome exactly once in the same iteration, but stop immediately on `blocked` or terminal retry failure
 - In `flowchart/src/App.tsx`, avoid reading `useRef().current` from render-time initialization paths; `eslint` enforces `react-hooks/refs` and fails on ref access during render.
+- `skills/qa-plan-generator/SKILL.md` supports two exclusive input modes (PRD path or free-text objective); objective mode must normalize to one allowed objective type and use deterministic filename `test-plan-objective-<objective-type>-<slug>.md`.
