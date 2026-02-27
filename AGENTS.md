@@ -2,7 +2,7 @@
 
 ## Overview
 
-Ralph is an autonomous AI agent loop that runs AI coding tools (Amp or Claude Code) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context.
+Ralph is an autonomous AI agent loop that runs AI coding tools (Amp, Claude Code, or Codex) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context.
 
 ## Commands
 
@@ -18,15 +18,25 @@ cd flowchart && npm run build
 
 # Run Ralph with Claude Code
 ./ralph.sh --tool claude [max_iterations]
+
+# Run Ralph with Codex
+./ralph.sh --tool codex [max_iterations]
+
+# Run QA loop executor
+./qa-codex-loop.sh --plan tasks/test-plan-foo.json --tool codex
 ```
 
 ## Key Files
 
-- `ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`)
+- `ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool amp`, `--tool claude`, or `--tool codex`)
 - `prompt.md` - Instructions given to each AMP instance
 -  `CLAUDE.md` - Instructions given to each Claude Code instance
 - `prd.json.example` - Example PRD format
 - `flowchart/` - Interactive React Flow diagram explaining how Ralph works
+- `skills/qa-plan-generator/SKILL.md` - Skill 1: produce deterministic `test-plan-*.md`
+- `skills/qa-plan-json/SKILL.md` - Skill 2: convert markdown plan to strict `test-plan-*.json`
+- `skills/qa-codex-loop/SKILL.md` - Skill 3: execute JSON plan with deterministic QA gate semantics
+- `qa-codex-loop.sh` - QA executor entrypoint with logs in `logs/qa-loop/<run-id>/`
 
 ## Flowchart
 
@@ -53,3 +63,4 @@ npm run dev
 - `skills/qa-plan-json/SKILL.md` defines a strict, versioned converter contract (`qaPlanSchemaVersion: 1.0.0`); keep Scenario Matrix column mapping deterministic and require actionable validation errors in format `E-<code> [line <n>] <message> :: <fix guidance>`.
 - `qa-codex-loop.sh` is the QA executor entrypoint: it requires `qaPlanSchemaVersion: 1.0.0`, sorts tests by numeric `TC-###`, and treats PASS strictly as zero exit plus `<status>PASS</status>` in agent output.
 - `qa-codex-loop.sh` remediation mode runs full-gate first, then bounded loops (`--max-loops`, optional `--max-duration`, optional `--max-patch-count`) with sequence: patch attempt -> failed-test rerun -> full-gate rerun; inspect `summary.json` `stopReason` and `unresolved.json` for terminal failures.
+- QA suite mirrors Ralph's 3-step architecture and handoff contract: `qa-plan-generator` -> `qa-plan-json` -> `qa-codex-loop`; keep artifact naming deterministic across each boundary (`test-plan-*.md`, then `test-plan-*.json`, then `logs/qa-loop/<run-id>/` artifacts).

@@ -225,6 +225,18 @@ Example:
 
 ---
 
+## Handoff (Skill 1 of 3)
+
+Pipeline order for QA suite alignment:
+
+1. `qa-plan-generator` (this skill) writes deterministic `test-plan-*.md`
+2. `qa-plan-json` converts markdown to strict `test-plan-*.json`
+3. `qa-codex-loop` executes JSON gate with `--tool codex|claude-code`
+
+When this skill finishes, return the generated markdown path explicitly for step 2.
+
+---
+
 ## Checklist
 
 Before returning the plan:

@@ -199,11 +199,11 @@ Examples:
 
 ## Handoff
 
-After generating JSON:
+Skill 2 of 3 in QA suite architecture. After generating JSON:
 
 1. Validate JSON against this schema contract
 2. Report any errors with source line numbers
-3. If valid, pass output path to `qa-codex-loop` execution skill
+3. If valid, pass output path to `qa-codex-loop` execution skill (`--plan <json> --tool codex|claude-code`)
 
 ---
 

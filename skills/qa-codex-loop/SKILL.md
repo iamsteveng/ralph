@@ -173,7 +173,7 @@ Standard QA pipeline handoff:
 
 1. `qa-plan-generator` emits `test-plan-*.md`
 2. `qa-plan-json` emits `test-plan-*.json`
-3. `qa-codex-loop` executes JSON plan and emits gate artifacts
+3. `qa-codex-loop` (Skill 3 of 3) executes JSON plan and emits gate artifacts
 
 ---
 

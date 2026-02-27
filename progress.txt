@@ -5,6 +5,7 @@
 - `skills/qa-plan-json/SKILL.md` should keep strict schema/versioning (`qaPlanSchemaVersion: 1.0.0`) and emit fail-fast validation messages with source-line references using `E-<code> [line <n>] ...` format.
 - `qa-codex-loop.sh` is the QA execution entrypoint; it enforces `qaPlanSchemaVersion: 1.0.0`, executes tests in sorted `TC-###` order, and only marks PASS when tool exit is zero and output includes `<status>PASS</status>`.
 - `qa-codex-loop.sh` remediation mode is bounded and deterministic: run a full gate first, then for each loop run patch attempt -> rerun failed tests -> rerun full gate, with stop controls (`maxLoops`, optional `maxDuration`, optional `maxPatchCount`) and terminal diagnostics in `summary.json` + `unresolved.json`.
+- QA suite architecture should always follow deterministic handoffs: `qa-plan-generator` produces `test-plan-*.md`, `qa-plan-json` produces `test-plan-*.json`, and `qa-codex-loop` writes run artifacts under `logs/qa-loop/<run-id>/`.
 
 Started: Fri Feb 27 08:44:00 UTC 2026
 ---
@@ -59,4 +60,14 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - Keep QA gate semantics tied to full-suite status; failed-test reruns are only an intermediate signal before required full-gate validation.
   - Persist remediation diagnostics in machine-readable files (`summary.json` + `unresolved.json`) so downstream loops can surface exact unresolved IDs and root causes.
   - Bound self-healing loops with explicit controls to avoid unbounded patch churn in autonomous execution.
+---
+## 2026-02-27 09:02:12 UTC - US-006
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Aligned QA skills with Ralph architecture conventions by documenting the deterministic 3-skill handoff chain across skill docs and root project docs.
+- Updated command and key-file guidance to include Codex parity and QA entrypoint/log ergonomics.
+- Files changed: `skills/qa-plan-generator/SKILL.md`, `skills/qa-plan-json/SKILL.md`, `skills/qa-codex-loop/SKILL.md`, `README.md`, `AGENTS.md`, `prd.json`, `progress.txt`.
+- **Learnings for future iterations:**
+  - Keep architecture-alignment work synchronized between skill-level docs and root docs; otherwise tooling contracts drift.
+  - Preserve deterministic artifact naming at each handoff boundary to keep QA generation, conversion, and execution interoperable.
+  - Keep `AGENTS.md` command/key-file sections synchronized with current tool support and entrypoints.
 ---
