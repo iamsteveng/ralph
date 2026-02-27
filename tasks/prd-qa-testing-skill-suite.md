@@ -57,6 +57,8 @@ Primary outcome: **faster release confidence via pre-merge quality gating**.
 **Description:** As a release engineer, I want to run the JSON plan with either Codex or Claude Code so that execution uses the best agent for the task.
 
 **Acceptance Criteria:**
+- [ ] Before implementation, review `ralph.sh` as baseline executor and document what can be reused for QA execution (iteration loop, tool invocation, logging, retry, status reporting)
+- [ ] Gap analysis is documented for `ralph.sh` vs QA needs (JSON plan ingestion, deterministic per-test execution, per-test result capture, strict gate semantics)
 - [ ] Execution skill supports explicit tool choice per run (`codex` or `claude-code`)
 - [ ] Execution skill reads JSON plan and runs test items in deterministic order
 - [ ] Execution stores logs, per-test outcomes, and aggregate summary
@@ -92,7 +94,7 @@ Primary outcome: **faster release confidence via pre-merge quality gating**.
 - **FR-3:** Skill 1 must support objective categories: acceptance, bug, test gap, flaky, refactor for testability, performance.
 - **FR-4:** Provide Skill 2 (`qa-plan-json`) that mirrors `skills/ralph/SKILL.md` converter discipline, parsing test plan markdown and emitting `test-plan-*.json` in a strict, versioned schema.
 - **FR-5:** Skill 2 must validate schema and fail fast on malformed or incomplete plans.
-- **FR-6:** Provide Skill 3 (`qa-codex-loop`) and script entrypoint to execute JSON plan using explicit tool choice (`codex` or `claude-code`).
+- **FR-6:** Provide Skill 3 (`qa-codex-loop`) and script entrypoint to execute JSON plan using explicit tool choice (`codex` or `claude-code`), implemented either as a focused extension of `ralph.sh` or as a new executor script derived from its loop/logging patterns.
 - **FR-7:** Skill 3 must implement strict gate semantics: success only when all required tests pass.
 - **FR-8:** Skill 3 must implement iterative remediation loops with configurable max loop limits.
 - **FR-9:** Skill 3 must produce machine-readable result artifacts and human-readable summary artifacts.
