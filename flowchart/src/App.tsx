@@ -225,6 +225,17 @@ function createNoteNode(note: typeof notes[0], visible: boolean, position?: { x:
   };
 }
 
+function createInitialNodes(): Node[] {
+  const stepNodes = allSteps.map((step, index) =>
+    createNode(step, index < 1, positions[step.id])
+  );
+  const noteNodes = notes.map((note) => {
+    const noteVisible = 1 >= note.appearsWithStep;
+    return createNoteNode(note, noteVisible, positions[note.id]);
+  });
+  return [...stepNodes, ...noteNodes];
+}
+
 function App() {
   const [visibleCount, setVisibleCount] = useState(1);
   const nodePositions = useRef<{ [key: string]: { x: number; y: number } }>({ ...positions });
@@ -240,7 +251,7 @@ function App() {
     return [...stepNodes, ...noteNodes];
   };
 
-  const initialNodes = getNodes(1);
+  const initialNodes = createInitialNodes();
   const initialEdges = edgeConnections.map((conn, index) =>
     createEdge(conn, index < 0)
   );

@@ -145,6 +145,34 @@ Ralph will:
 7. Append learnings to `progress.txt`
 8. Repeat until all stories pass or max iterations reached
 
+## QA Testing Skill Suite (Ralph-Aligned)
+
+The QA suite follows the same architecture pattern as Ralph's PRD pipeline: deterministic 3-step handoff with stable artifact names between each stage.
+
+1. `qa-plan-generator` (Skill 1): create deterministic `test-plan-*.md`
+2. `qa-plan-json` (Skill 2): convert markdown plan to strict `test-plan-*.json` (`qaPlanSchemaVersion: 1.0.0`)
+3. `qa-codex-loop` (Skill 3): execute JSON tests deterministically and emit machine-readable gate status
+
+### QA Entrypoint
+
+```bash
+./qa-codex-loop.sh --plan tasks/test-plan-foo.json --tool codex
+# or
+./qa-codex-loop.sh --plan tasks/test-plan-foo.json --tool claude-code
+```
+
+### QA Logs and Status Artifacts
+
+`qa-codex-loop.sh` mirrors Ralph log ergonomics with run-scoped artifact folders:
+
+- `logs/qa-loop/<run-id>/plan.json`
+- `logs/qa-loop/<run-id>/outcomes.jsonl`
+- `logs/qa-loop/<run-id>/summary.json`
+- `logs/qa-loop/<run-id>/status.txt` (`PASS` or `FAIL`)
+- `logs/qa-loop/<run-id>/tests/<test-id>/...`
+- `logs/qa-loop/<run-id>/attempts/<label>/...`
+- `logs/qa-loop/<run-id>/remediation/loop-XX/...`
+
 ## Key Files
 
 | File | Purpose |
@@ -157,6 +185,10 @@ Ralph will:
 | `progress.txt` | Append-only learnings for future iterations |
 | `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
 | `skills/ralph/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
+| `skills/qa-plan-generator/` | Skill 1: generate deterministic QA plan markdown |
+| `skills/qa-plan-json/` | Skill 2: convert QA plan markdown to strict JSON |
+| `skills/qa-codex-loop/` | Skill 3: execute QA JSON plan with deterministic gate semantics |
+| `qa-codex-loop.sh` | QA executor entrypoint with bounded remediation loops |
 | `.claude-plugin/` | Plugin manifest for Claude Code marketplace discovery |
 | `flowchart/` | Interactive visualization of how Ralph works |
 
