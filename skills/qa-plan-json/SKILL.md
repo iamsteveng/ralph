@@ -60,7 +60,7 @@ Example valid input:
 6. Emit stable ordering:
    - top-level metadata
    - `tests` sorted by numeric test ID
-   - within each test: `steps`, `commands`, `passCriteria`, `evidence.required`
+   - within each test: `steps`, `commands`, `passFail`, `evidence.required`
 7. Reject duplicate IDs, missing columns, unknown priorities, or malformed level/source values.
 
 ---
@@ -97,13 +97,15 @@ Output must conform to this schema contract:
       "commands": [
         "npm test -- --runInBand"
       ],
-      "passCriteria": [
+      "passFail": [
         "Expected result statement"
       ],
-      "retryRule": {
-        "maxRetries": 0,
-        "retryOn": ["flake", "timeout"]
-      },
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": ["flake", "timeout"]
+        }
+      ],
       "evidence": {
         "required": [
           "test output log"
@@ -121,8 +123,8 @@ Field requirements:
 - `tests[*].id`: required, `TC-###` format, unique
 - `tests[*].steps`: required non-empty array
 - `tests[*].commands`: required array (may be empty if marked manual in steps)
-- `tests[*].passCriteria`: required non-empty array
-- `tests[*].retryRule`: required object with deterministic defaults
+- `tests[*].passFail`: required non-empty array
+- `tests[*].retryRules`: required non-empty array of retry rule objects
 - `tests[*].evidence.required`: required non-empty array
 
 Allowed enums:
@@ -142,7 +144,7 @@ Map Scenario Matrix columns to JSON:
 - `Level` -> `tests[*].level`
 - `Scenario` -> `tests[*].title`
 - `Steps` -> `tests[*].steps` (split into ordered list)
-- `Expected Result` -> `tests[*].passCriteria`
+- `Expected Result` -> `tests[*].passFail`
 - `Evidence` -> `tests[*].evidence.required`
 - `Priority` -> `tests[*].priority`
 

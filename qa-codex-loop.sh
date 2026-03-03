@@ -92,6 +92,11 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "Error: python3 is required"
+  exit 1
+fi
+
 if [[ "$TOOL" == "codex" ]] && ! command -v codex >/dev/null 2>&1; then
   echo "Error: codex CLI not found"
   exit 1
@@ -134,19 +139,20 @@ extract_tag_text() {
   local file_path="$1"
   local tag="$2"
 
-  perl -0777 -ne '
-    use strict;
-    use warnings;
-    my ($tag) = @ARGV;
-    if (/<$tag>\s*(.*?)\s*<\/$tag>/s) {
-      my $text = $1;
-      $text =~ s/\r/ /g;
-      $text =~ s/\n+/ /g;
-      $text =~ s/\s+/ /g;
-      $text =~ s/^\s+|\s+$//g;
-      print $text;
-    }
-  ' "$tag" "$file_path"
+  python3 - "$file_path" "$tag" <<'PY'
+import re
+import sys
+
+file_path = sys.argv[1]
+tag = re.escape(sys.argv[2])
+
+with open(file_path, encoding="utf-8", errors="ignore") as f:
+    text = f.read()
+
+match = re.search(fr"<{tag}>\s*(.*?)\s*</{tag}>", text, re.S | re.I)
+if match:
+    print(" ".join(match.group(1).split()))
+PY
 }
 
 run_test() {
@@ -204,7 +210,7 @@ run_test() {
     fi
     echo ""
     echo "## Pass Criteria"
-    jq -r '.passCriteria[] | "- " + .' <<< "$test_json"
+    jq -r '(.passFail // .passCriteria // [])[] | "- " + .' <<< "$test_json"
     echo ""
     echo "## Evidence Required"
     jq -r '.evidence.required[] | "- " + .' <<< "$test_json"
@@ -350,24 +356,26 @@ build_failed_ids_json() {
 extract_root_causes_json() {
   local remediation_output="$1"
 
-  perl -0777 -ne '
-    use strict;
-    use warnings;
-    use JSON::PP;
-    my @items = ();
-    if (/<root_causes>\s*(.*?)\s*<\/root_causes>/s) {
-      my $inner = $1;
-      while ($inner =~ /<item>\s*(.*?)\s*<\/item>/sg) {
-        my $item = $1;
-        $item =~ s/\r/ /g;
-        $item =~ s/\n+/ /g;
-        $item =~ s/\s+/ /g;
-        $item =~ s/^\s+|\s+$//g;
-        push @items, $item if length $item;
-      }
-    }
-    print encode_json(\@items);
-  ' "$remediation_output"
+  python3 - "$remediation_output" <<'PY'
+import json
+import re
+import sys
+
+file_path = sys.argv[1]
+with open(file_path, encoding="utf-8", errors="ignore") as f:
+    text = f.read()
+
+items = []
+root = re.search(r"<root_causes>\s*(.*?)\s*</root_causes>", text, re.S | re.I)
+if root:
+    items = [
+        " ".join(item.split())
+        for item in re.findall(r"<item>\s*(.*?)\s*</item>", root.group(1), re.S | re.I)
+        if item.strip()
+    ]
+
+print(json.dumps(items))
+PY
 }
 
 run_remediation() {

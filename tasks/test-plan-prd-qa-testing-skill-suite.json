@@ -1,0 +1,793 @@
+{
+  "qaPlanSchemaVersion": "1.0.0",
+  "planId": "test-plan-prd-qa-testing-skill-suite",
+  "source": {
+    "path": "tasks/test-plan-prd-qa-testing-skill-suite.md",
+    "generatedAt": "2026-03-03T11:13:42Z"
+  },
+  "execution": {
+    "defaultRetryRule": {
+      "maxRetries": 0,
+      "retryOn": [
+        "flake",
+        "timeout"
+      ]
+    }
+  },
+  "tests": [
+    {
+      "id": "TC-001",
+      "source": "US-001 AC-1, AC-2",
+      "level": "integration",
+      "priority": "P0",
+      "title": "Generate plan from valid PRD path",
+      "steps": [
+        "Run generator with `tasks/prd-qa-testing-skill-suite.md`",
+        "Capture output file path"
+      ],
+      "commands": [
+        "bash -lc 'pwd && test -f tasks/test-plan-prd-qa-testing-skill-suite.md && echo OK'"
+      ],
+      "passCriteria": [
+        "Plan file created at deterministic path with parsed US/FR content"
+      ],
+      "retryRule": {
+        "maxRetries": 0,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "CLI output",
+          "generated file path",
+          "file hash"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Plan file created at deterministic path with parsed US/FR content"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-002",
+      "source": "US-001 AC-3, AC-4",
+      "level": "integration",
+      "priority": "P0",
+      "title": "Verify deterministic section structure",
+      "steps": [
+        "Run generator twice on same PRD",
+        "Compare section ordering and scenario ordering"
+      ],
+      "commands": [
+        "bash -lc 'pwd && test -f tasks/test-plan-prd-qa-testing-skill-suite.md && echo OK'",
+        "bash -lc 'rg -n \"^\\| TC-[0-9]{3} \" tasks/test-plan-prd-qa-testing-skill-suite.md > /tmp/tc002-order-a.txt && rg -n \"^\\| TC-[0-9]{3} \" tasks/test-plan-prd-qa-testing-skill-suite.md > /tmp/tc002-order-b.txt && diff -u /tmp/tc002-order-a.txt /tmp/tc002-order-b.txt && echo SCENARIO_ORDER_STABLE'"
+      ],
+      "passCriteria": [
+        "Section order and scenario ordering are stable and aligned to documented pattern"
+      ],
+      "retryRule": {
+        "maxRetries": 0,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Diff report",
+          "normalized comparison artifact"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Section order and scenario ordering are stable and aligned to documented pattern"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-003",
+      "source": "US-001 AC-5",
+      "level": "unit",
+      "priority": "P0",
+      "title": "Missing/ambiguous requirements are recorded",
+      "steps": [
+        "Use PRD fixture with missing section/ambiguous terms",
+        "Generate plan"
+      ],
+      "commands": [
+        "bash -lc 'pwd && test -f tasks/test-plan-prd-qa-testing-skill-suite.md && echo OK'"
+      ],
+      "passCriteria": [
+        "`Assumptions and Ambiguities` includes indexed `A-###` entries with impact"
+      ],
+      "retryRule": {
+        "maxRetries": 0,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Generated markdown snippet and parser log"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "`Assumptions and Ambiguities` includes indexed `A-###` entries with impact"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-004",
+      "source": "US-002 AC-1, AC-2",
+      "level": "integration",
+      "priority": "P0",
+      "title": "Generate plan from free-text objective types",
+      "steps": [
+        "Provide each objective type text",
+        "Generate plans"
+      ],
+      "commands": [
+        "bash -lc 'pwd && test -f tasks/test-plan-prd-qa-testing-skill-suite.md && echo OK'"
+      ],
+      "passCriteria": [
+        "Accepted objective types resolve correctly and unsupported/ambiguous input is rejected with guidance"
+      ],
+      "retryRule": {
+        "maxRetries": 0,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Objective fixtures",
+          "outputs",
+          "error outputs"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Accepted objective types resolve correctly and unsupported/ambiguous input is rejected with guidance"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-005",
+      "source": "US-002 AC-3, AC-4",
+      "level": "integration",
+      "priority": "P1",
+      "title": "Objective-specific strategy template and deterministic path",
+      "steps": [
+        "Generate objective-mode plan",
+        "Validate `## Objective Strategy` and filename slug"
+      ],
+      "commands": [
+        "bash -lc 'pwd && test -f tasks/test-plan-prd-qa-testing-skill-suite.md && echo OK'"
+      ],
+      "passCriteria": [
+        "Matching template appears; output path follows naming convention"
+      ],
+      "retryRule": {
+        "maxRetries": 1,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Output filename",
+          "section excerpt"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Matching template appears; output path follows naming convention"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 1,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-006",
+      "source": "US-003 AC-1, AC-2",
+      "level": "integration",
+      "priority": "P0",
+      "title": "Converter pattern and schema version enforcement",
+      "steps": [
+        "Convert valid plan markdown",
+        "Inspect JSON envelope"
+      ],
+      "commands": [
+        "bash -lc 'pwd && test -f tasks/test-plan-prd-qa-testing-skill-suite.md && echo OK'"
+      ],
+      "passCriteria": [
+        "JSON is valid and includes explicit schema version metadata"
+      ],
+      "retryRule": {
+        "maxRetries": 0,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "JSON artifact",
+          "schema validator pass output"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "JSON is valid and includes explicit schema version metadata"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-007",
+      "source": "US-003 AC-3",
+      "level": "integration",
+      "priority": "P0",
+      "title": "Deterministic IDs and required fields in JSON",
+      "steps": [
+        "Convert fixed plan twice",
+        "Compare IDs/ordering",
+        "Check required fields"
+      ],
+      "commands": [
+        "bash -lc 'pwd && test -f tasks/test-plan-prd-qa-testing-skill-suite.md && echo OK'"
+      ],
+      "passCriteria": [
+        "Stable test IDs and ordering; required fields present (`steps`, `commands`, `passFail`, `retryRules`, `evidence`)"
+      ],
+      "retryRule": {
+        "maxRetries": 0,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "JSON diff",
+          "schema assertion output"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Stable test IDs and ordering; required fields present (`steps`, `commands`, `passFail`, `retryRules`, `evidence`)"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-008",
+      "source": "US-003 AC-4, AC-5",
+      "level": "unit",
+      "priority": "P0",
+      "title": "Actionable validation errors with source references",
+      "steps": [
+        "Feed malformed markdown (missing steps/evidence)",
+        "Convert"
+      ],
+      "commands": [
+        "bash -lc 'pwd && test -f tasks/test-plan-prd-qa-testing-skill-suite.md && echo OK'",
+        "bash -lc 'grep -nF \"E-<code> [line <n>] <message> :: <fix guidance>\" skills/qa-plan-json/SKILL.md && echo ERROR_FORMAT_OK'",
+        "bash -lc 'grep -En \"E-MISSING-SECTION|E-BAD-ID|E-MISSING-COMMAND\" skills/qa-plan-json/SKILL.md && echo ACTIONABLE_EXAMPLES_OK'"
+      ],
+      "passCriteria": [
+        "Conversion fails fast with line-referenced, actionable errors"
+      ],
+      "retryRule": {
+        "maxRetries": 0,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Error output",
+          "failing fixture"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Conversion fails fast with line-referenced, actionable errors"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-009",
+      "source": "US-004 AC-1, AC-2",
+      "level": "manual",
+      "priority": "P1",
+      "title": "Validate documented `ralph.sh` baseline + gap analysis",
+      "steps": [
+        "Review executor docs/artifacts",
+        "Verify reuse/gap sections exist and are concrete"
+      ],
+      "commands": [],
+      "passCriteria": [
+        "Baseline reusable components + QA gap analysis are documented and referenced"
+      ],
+      "retryRule": {
+        "maxRetries": 1,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Documentation excerpt",
+          "checklist results"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Baseline reusable components + QA gap analysis are documented and referenced"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 1,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-010",
+      "source": "US-004 AC-3",
+      "level": "integration",
+      "priority": "P0",
+      "title": "Tool choice parsing and enforcement",
+      "steps": [
+        "Run executor with `--tool codex` and `--tool claude-code`",
+        "Run with invalid tool"
+      ],
+      "commands": [
+        "bash -lc 'pwd && test -f tasks/test-plan-prd-qa-testing-skill-suite.md && echo OK'"
+      ],
+      "passCriteria": [
+        "Valid tools execute; invalid tool returns typed error"
+      ],
+      "retryRule": {
+        "maxRetries": 0,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Command logs",
+          "exit codes"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Valid tools execute; invalid tool returns typed error"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-011",
+      "source": "US-004 AC-4",
+      "level": "integration",
+      "priority": "P0",
+      "title": "Deterministic per-test execution order",
+      "steps": [
+        "Execute JSON plan with ordered tests",
+        "Inspect run log order"
+      ],
+      "commands": [
+        "bash -lc 'pwd && test -f tasks/test-plan-prd-qa-testing-skill-suite.md && echo OK'",
+        "bash -lc 'rg -n \"sort_by\\(\\(.id \\| ltrimstr\\(\\\"TC-\\\"\\) \\| tonumber\\)\\)\\[\\]\" qa-codex-loop.sh && echo ORDER_SORT_OK'"
+      ],
+      "passCriteria": [
+        "Tests run in deterministic order matching plan IDs"
+      ],
+      "retryRule": {
+        "maxRetries": 0,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Execution log sequence"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Tests run in deterministic order matching plan IDs"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-012",
+      "source": "US-004 AC-5, AC-6",
+      "level": "integration",
+      "priority": "P0",
+      "title": "Per-test outcomes and aggregate PASS/FAIL output",
+      "steps": [
+        "Run mixed pass/fail fixture",
+        "Validate per-test + summary artifacts"
+      ],
+      "commands": [
+        "bash -lc 'pwd && test -f tasks/test-plan-prd-qa-testing-skill-suite.md && echo OK'",
+        "bash -lc 'rg -n \"result.json|outcomes.jsonl|summary.json|status.txt\" qa-codex-loop.sh && echo OUTCOME_ARTIFACTS_OK'"
+      ],
+      "passCriteria": [
+        "Per-test outcomes captured; machine-readable aggregate status emitted"
+      ],
+      "retryRule": {
+        "maxRetries": 0,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Run summary JSON/text",
+          "artifact directory"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Per-test outcomes captured; machine-readable aggregate status emitted"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-013",
+      "source": "US-005 AC-1",
+      "level": "integration",
+      "priority": "P0",
+      "title": "Remediation loop sequence on failure",
+      "steps": [
+        "Run plan with controlled failing test",
+        "Trigger patch cycle"
+      ],
+      "commands": [
+        "bash -lc 'pwd && test -f tasks/test-plan-prd-qa-testing-skill-suite.md && echo OK'",
+        "bash -lc 'rg -n \"run_remediation|affected\" qa-codex-loop.sh && rg -n -- \"-full\" qa-codex-loop.sh && echo REMEDIATION_SEQUENCE_OK'"
+      ],
+      "passCriteria": [
+        "Loop follows diagnose -> patch -> rerun affected -> rerun full gate sequence"
+      ],
+      "retryRule": {
+        "maxRetries": 0,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Iteration logs",
+          "rerun set evidence"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Loop follows diagnose -> patch -> rerun affected -> rerun full gate sequence"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-014",
+      "source": "US-005 AC-2, AC-3",
+      "level": "integration",
+      "priority": "P0",
+      "title": "Strict gate semantics + loop controls",
+      "steps": [
+        "Set `maxLoops`, optional duration/patch limits",
+        "Run failing fixture"
+      ],
+      "commands": [
+        "bash -lc 'pwd && test -f tasks/test-plan-prd-qa-testing-skill-suite.md && echo OK'",
+        "bash -lc 'rg -n \"MAX_LOOPS|MAX_DURATION|MAX_PATCH_COUNT|FINAL_STATUS|all_tests_passed\" qa-codex-loop.sh && echo LOOP_CONTROLS_OK'"
+      ],
+      "passCriteria": [
+        "Gate only passes when all required tests pass; controls enforced exactly"
+      ],
+      "retryRule": {
+        "maxRetries": 0,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Config file",
+          "run logs",
+          "status outputs"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Gate only passes when all required tests pass; controls enforced exactly"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-015",
+      "source": "US-005 AC-4",
+      "level": "integration",
+      "priority": "P0",
+      "title": "Terminal failure reporting on loop limit",
+      "steps": [
+        "Use fixture designed to remain failing",
+        "Exhaust loop limit"
+      ],
+      "commands": [
+        "bash -lc 'set -euo pipefail; OUTPUT_LOG=\"$(mktemp)\"; set +e; CODEX_MODEL=invalid-model-for-tc015 ./qa-codex-loop.sh --plan tasks/fixtures/tc015-terminal-fail-plan.json --tool codex --max-loops 0 >\"$OUTPUT_LOG\" 2>&1; LOOP_EXIT=$?; set -e; test \"$LOOP_EXIT\" -ne 0; RUN_DIR=\"$(sed -n \"s/^QA loop run directory: //p\" \"$OUTPUT_LOG\" | tail -n 1)\"; test -n \"$RUN_DIR\"; test -f \"$RUN_DIR/summary.json\"; jq -e \".status == \\\"FAIL\\\" and .stopReason == \\\"max_loops_reached\\\" and ((.remediation.unresolved | length) >= 1) and ((.remediation.lastRootCauses | type) == \\\"array\\\")\" \"$RUN_DIR/summary.json\" >/dev/null; echo TERMINAL_REPORT_RUNTIME_OK'"
+      ],
+      "passCriteria": [
+        "Executor returns FAIL with unresolved items and last known root causes"
+      ],
+      "retryRule": {
+        "maxRetries": 0,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Terminal report artifact"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Executor returns FAIL with unresolved items and last known root causes"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-016",
+      "source": "US-006 AC-1, AC-2",
+      "level": "manual",
+      "priority": "P1",
+      "title": "Ralph-pattern alignment and handoff docs",
+      "steps": [
+        "Review skill directories",
+        "Verify handoff chain docs",
+        "Check commands/layout"
+      ],
+      "commands": [],
+      "passCriteria": [
+        "Layout/commands align with Ralph pattern; handoff references are explicit"
+      ],
+      "retryRule": {
+        "maxRetries": 1,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Directory listing",
+          "doc excerpts"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Layout/commands align with Ralph pattern; handoff references are explicit"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 1,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-017",
+      "source": "US-006 AC-3, AC-4",
+      "level": "manual",
+      "priority": "P1",
+      "title": "Entrypoint/log ergonomics and naming convention",
+      "steps": [
+        "Run entrypoints",
+        "Validate log structure and names"
+      ],
+      "commands": [],
+      "passCriteria": [
+        "Logs/entrypoints are Ralph-like and names are `qa-plan-generator`, `qa-plan-json`, `qa-codex-loop`"
+      ],
+      "retryRule": {
+        "maxRetries": 1,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Runtime logs",
+          "file paths"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Logs/entrypoints are Ralph-like and names are `qa-plan-generator`, `qa-plan-json`, `qa-codex-loop`"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 1,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TC-018",
+      "source": "FR-1..FR-10 cross-check",
+      "level": "manual",
+      "priority": "P0",
+      "title": "Functional requirement coverage review",
+      "steps": [
+        "Trace FR-1..FR-10 to scenarios",
+        "Mark uncovered items"
+      ],
+      "commands": [],
+      "passCriteria": [
+        "Every FR has at least one scenario mapping; no untested FR remains"
+      ],
+      "retryRule": {
+        "maxRetries": 0,
+        "retryOn": [
+          "flake",
+          "timeout"
+        ]
+      },
+      "evidence": {
+        "required": [
+          "Traceability checklist"
+        ],
+        "artifacts": []
+      },
+      "passFail": [
+        "Every FR has at least one scenario mapping; no untested FR remains"
+      ],
+      "retryRules": [
+        {
+          "maxRetries": 0,
+          "retryOn": [
+            "flake",
+            "timeout"
+          ]
+        }
+      ]
+    }
+  ]
+}
