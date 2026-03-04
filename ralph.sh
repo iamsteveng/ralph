@@ -182,7 +182,7 @@ send_iteration_update() {
   fi
 
   # Fire-and-forget to avoid deadlocking when Ralph is invoked from an active agent turn.
-  (openclaw agent --session-id "$session_id" --message "$message" --thinking off --timeout 90 >/dev/null 2>&1 &) || true
+  (openclaw agent --session-id "$session_id" --message "$message" --timeout 90 >/dev/null 2>&1 &) || true
 }
 
 for i in $(seq 1 $MAX_ITERATIONS); do
