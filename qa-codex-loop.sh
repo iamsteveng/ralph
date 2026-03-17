@@ -188,8 +188,19 @@ run_test() {
   status_file="$test_dir/status.txt"
   result_json="$test_dir/result.json"
 
+  # Derive expected test file path from level and test ID
+  local test_file_hint=""
+  local test_file_lower
+  test_file_lower="$(echo "$test_id" | tr '[:upper:]' '[:lower:]')"
+  case "$level" in
+    e2e)         test_file_hint="tests/e2e/${test_file_lower}.test.ts" ;;
+    integration) test_file_hint="tests/integration/${test_file_lower}.test.ts" ;;
+    unit)        test_file_hint="tests/unit/${test_file_lower}.test.ts" ;;
+    *)           test_file_hint="" ;;
+  esac
+
   {
-    echo "# QA Test Execution"
+    echo "# QA Test — Implement and Run"
     echo ""
     echo "Test ID: $test_id"
     echo "Title: $title"
@@ -197,27 +208,50 @@ run_test() {
     echo "Priority: $priority"
     echo ""
     echo "You are executing one deterministic QA test case from a JSON test plan."
-    echo "Run the provided commands exactly and evaluate pass criteria."
+    echo "Your job has two phases:"
     echo ""
-    echo "## Steps"
+    echo "## Phase 1 — Implement the test (if it does not yet exist)"
+    echo ""
+    if [[ -n "$test_file_hint" ]]; then
+      echo "Expected test file: \`$test_file_hint\`"
+      echo ""
+      echo "1. Check whether \`$test_file_hint\` exists."
+      echo "2. If it does NOT exist (or lacks a test for $test_id), write the full test"
+      echo "   implementation to \`$test_file_hint\` following the steps and pass criteria below."
+      echo "3. Use the project's existing test framework (Vitest) and import helpers from"
+      echo "   \`tests/utils/\` or \`packages/test-utils/\` if they exist."
+      echo "4. The test MUST be identifiable by the grep pattern \`$test_id\` (include it in"
+      echo "   the describe/it block name)."
+      echo "5. After writing or modifying any test file, stage and commit it:"
+      echo "   \`git add $test_file_hint && git commit -m 'test: implement $test_id'\`"
+    else
+      echo "This is a manual verification test — no test file to implement."
+      echo "Proceed directly to Phase 2."
+    fi
+    echo ""
+    echo "## Phase 2 — Run the test and evaluate pass criteria"
+    echo ""
+    echo "### Steps"
     jq -r '.steps[] | "- " + .' <<< "$test_json"
     echo ""
-    echo "## Commands"
+    echo "### Commands"
     if jq -e '.commands | length > 0' <<< "$test_json" >/dev/null; then
       jq -r '.commands[]' <<< "$test_json" | sed 's/^/- `&`/'
     else
       echo "- No commands provided (manual verification path)."
     fi
     echo ""
-    echo "## Pass Criteria"
+    echo "### Pass Criteria"
     jq -r '(.passFail // .passCriteria // [])[] | "- " + .' <<< "$test_json"
     echo ""
-    echo "## Evidence Required"
+    echo "### Evidence Required"
     jq -r '.evidence.required[] | "- " + .' <<< "$test_json"
     echo ""
-    echo "Return exact tags in your final answer:"
+    echo "## Response Format"
+    echo ""
+    echo "After completing both phases, respond with exact tags:"
     echo "<status>PASS</status> or <status>FAIL</status>"
-    echo "<evidence>...concise evidence...</evidence>"
+    echo "<evidence>...concise evidence from test output...</evidence>"
     echo "<reason>...concise failure reason when FAIL...</reason>"
   } > "$prompt_file"
 
