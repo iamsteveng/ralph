@@ -11,6 +11,8 @@ CODEX_MODEL="${CODEX_MODEL:-gpt-5.3-codex}"
 MAX_LOOPS="${QA_MAX_LOOPS:-3}"
 MAX_DURATION="${QA_MAX_DURATION_SECONDS:-0}"
 MAX_PATCH_COUNT="${QA_MAX_PATCH_COUNT:-0}"
+WORKSPACE_DIR="${QA_WORKSPACE_DIR:-$(pwd)}"
+PROGRESS_FILE="$WORKSPACE_DIR/qa-progress.txt"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -38,6 +40,11 @@ while [[ $# -gt 0 ]]; do
       MAX_PATCH_COUNT="$2"
       shift 2
       ;;
+    --workspace-dir)
+      WORKSPACE_DIR="$2"
+      PROGRESS_FILE="$WORKSPACE_DIR/qa-progress.txt"
+      shift 2
+      ;;
     --help|-h)
       cat <<'USAGE'
 Usage: ./qa-codex-loop.sh --plan <test-plan.json> --tool codex|claude-code [options]
@@ -47,6 +54,7 @@ Options:
   --max-loops <n>           Maximum remediation loops after initial full run (default: 3)
   --max-duration <seconds>  Optional max wall-clock duration, 0 disables limit (default: 0)
   --max-patch-count <n>     Optional max remediation patch attempts, 0 disables limit (default: 0)
+  --workspace-dir <path>    Project workspace root for qa-progress.txt (default: cwd)
 USAGE
       exit 0
       ;;
@@ -135,6 +143,273 @@ echo "maxLoops=$MAX_LOOPS" >> "$RUN_DIR/run.env"
 echo "maxDurationSeconds=$MAX_DURATION" >> "$RUN_DIR/run.env"
 echo "maxPatchCount=$MAX_PATCH_COUNT" >> "$RUN_DIR/run.env"
 
+# ─── qa-progress.txt helpers ──────────────────────────────────────────────────
+
+# Initialize qa-progress.txt for this run (creates if missing, appends run header if exists)
+init_progress_file() {
+  local run_date
+  run_date="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+  if [[ ! -f "$PROGRESS_FILE" ]]; then
+    cat > "$PROGRESS_FILE" <<EOF
+# QA Progress Log
+Started: $run_date
+---
+
+## Codebase Patterns
+(no patterns captured yet — will be populated after successful runs)
+
+---
+EOF
+  fi
+
+  # Append new run header
+  cat >> "$PROGRESS_FILE" <<EOF
+
+## Run: $RUN_ID [$run_date]
+EOF
+}
+
+# Extract the ## Codebase Patterns section from qa-progress.txt
+get_codebase_patterns() {
+  python3 - "$PROGRESS_FILE" <<'PY'
+import sys
+import re
+
+file_path = sys.argv[1]
+try:
+    with open(file_path, encoding="utf-8", errors="ignore") as f:
+        text = f.read()
+
+    # Extract ## Codebase Patterns section (up to next ## heading or end of file)
+    match = re.search(r"(## Codebase Patterns.*?)(?=\n## |\Z)", text, re.S)
+    if match:
+        print(match.group(1).strip())
+    else:
+        print("## Codebase Patterns\n(none yet)")
+except FileNotFoundError:
+    print("## Codebase Patterns\n(none yet)")
+PY
+}
+
+# Returns 0 (true) if test_id already recorded as [PASS] in this run's section
+check_already_passed() {
+  local run_id="$1"
+  local test_id="$2"
+
+  if [[ ! -f "$PROGRESS_FILE" ]]; then
+    return 1
+  fi
+
+  python3 - "$PROGRESS_FILE" "$run_id" "$test_id" <<'PY'
+import sys
+import re
+
+file_path = sys.argv[1]
+run_id = sys.argv[2]
+test_id = sys.argv[3]
+
+try:
+    with open(file_path, encoding="utf-8", errors="ignore") as f:
+        text = f.read()
+
+    # Find the section for this run_id
+    run_section = re.search(
+        rf"## Run: {re.escape(run_id)}.*?(?=\n## Run:|\Z)",
+        text, re.S
+    )
+    if run_section:
+        section_text = run_section.group(0)
+        if re.search(rf"### {re.escape(test_id)} \[PASS\]", section_text):
+            sys.exit(0)  # Found — already passed
+except FileNotFoundError:
+    pass
+sys.exit(1)  # Not found
+PY
+}
+
+# Append a test result entry to qa-progress.txt
+append_test_progress() {
+  local test_id="$1"
+  local title="$2"
+  local status="$3"
+  local evidence="$4"
+  local reason="$5"
+  local learnings="$6"
+
+  {
+    echo ""
+    echo "### $test_id [$status] $title"
+    if [[ "$status" == "FAIL" && -n "$reason" ]]; then
+      echo "- **Failed:** $reason"
+    fi
+    if [[ -n "$evidence" ]]; then
+      echo "- **Evidence:** $evidence"
+    fi
+    if [[ -n "$learnings" ]]; then
+      echo "- **Learnings:**"
+      while IFS= read -r line; do
+        [[ -n "$line" ]] && echo "  - $line"
+      done <<< "$learnings"
+    fi
+    echo "---"
+  } >> "$PROGRESS_FILE"
+}
+
+# Append a remediation loop summary to qa-progress.txt
+append_remediation_progress() {
+  local loop_label="$1"
+  local failed_ids="$2"
+  local root_causes="$3"
+  local fixes_summary="$4"
+  local result="$5"
+
+  {
+    echo ""
+    echo "## Remediation: $RUN_ID $loop_label"
+    echo "- Failed tests: $failed_ids"
+    echo "- Root causes identified: $root_causes"
+    echo "- Fixes applied: $fixes_summary"
+    echo "- Result: $result"
+    echo "---"
+  } >> "$PROGRESS_FILE"
+}
+
+# Distill learnings from this run into ## Codebase Patterns at top of qa-progress.txt
+update_codebase_patterns() {
+  local run_learnings
+  run_learnings="$(python3 - "$PROGRESS_FILE" "$RUN_ID" <<'PY'
+import sys
+import re
+
+file_path = sys.argv[1]
+run_id = sys.argv[2]
+
+try:
+    with open(file_path, encoding="utf-8", errors="ignore") as f:
+        text = f.read()
+
+    # Find this run's section
+    run_section = re.search(
+        rf"## Run: {re.escape(run_id)}.*?(?=\n## Run:|\n## Remediation:|\Z)",
+        text, re.S
+    )
+    if run_section:
+        # Extract all Learnings bullet lines
+        learnings_blocks = re.findall(
+            r"\*\*Learnings:\*\*\n((?:\s+- .+\n?)+)",
+            run_section.group(0)
+        )
+        all_items = []
+        for block in learnings_blocks:
+            items = re.findall(r"- (.+)", block)
+            all_items.extend(items)
+        print("\n".join(all_items))
+except FileNotFoundError:
+    pass
+PY
+)"
+
+  if [[ -z "$run_learnings" ]]; then
+    return 0
+  fi
+
+  python3 - "$PROGRESS_FILE" "$run_learnings" <<'PY'
+import sys
+import re
+
+file_path = sys.argv[1]
+new_learnings = sys.argv[2]
+
+try:
+    with open(file_path, encoding="utf-8", errors="ignore") as f:
+        text = f.read()
+
+    # Find the Codebase Patterns section (between heading and first ---)
+    match = re.search(r"(## Codebase Patterns\n)(.*?)(\n---)", text, re.S)
+    if match:
+        existing = match.group(2).strip()
+        # Remove placeholder text
+        if "(no patterns captured yet" in existing or "(none yet)" in existing:
+            existing = ""
+
+        new_items = [line.strip() for line in new_learnings.strip().split("\n") if line.strip()]
+        new_bullets = []
+        for item in new_items:
+            bullet = item if item.startswith("-") else f"- {item}"
+            # Deduplicate against existing
+            if bullet not in existing:
+                new_bullets.append(bullet)
+
+        if existing and new_bullets:
+            combined = existing + "\n" + "\n".join(new_bullets)
+        elif new_bullets:
+            combined = "\n".join(new_bullets)
+        else:
+            combined = existing
+
+        new_section = f"{match.group(1)}{combined}{match.group(3)}"
+        text = text[:match.start()] + new_section + text[match.end():]
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(text)
+except FileNotFoundError:
+    pass
+PY
+}
+
+# Seed (or update) ## QA Patterns in CLAUDE.md with distilled codebase patterns
+seed_claude_md() {
+  local claude_md="$WORKSPACE_DIR/CLAUDE.md"
+  local patterns
+  patterns="$(get_codebase_patterns)"
+
+  # Skip if nothing useful to write
+  if [[ -z "$patterns" ]] || \
+     echo "$patterns" | grep -q "(no patterns captured yet" || \
+     echo "$patterns" | grep -q "(none yet)"; then
+    return 0
+  fi
+
+  local qa_section
+  qa_section="$(printf "## QA Patterns\n\n_Auto-generated by qa-codex-loop on %s (run: %s)_\n\n%s\n" \
+    "$(date -u '+%Y-%m-%d %H:%M UTC')" "$RUN_ID" "$patterns")"
+
+  if [[ -f "$claude_md" ]]; then
+    if grep -q "## QA Patterns" "$claude_md"; then
+      # Replace existing QA Patterns section
+      python3 - "$claude_md" "$qa_section" <<'PY'
+import sys
+import re
+
+file_path = sys.argv[1]
+new_section = sys.argv[2]
+
+with open(file_path, encoding="utf-8", errors="ignore") as f:
+    text = f.read()
+
+updated = re.sub(r"## QA Patterns.*?(?=\n## |\Z)", new_section.rstrip(), text, flags=re.S)
+with open(file_path, "w", encoding="utf-8") as f:
+    f.write(updated)
+PY
+    else
+      # Append section
+      {
+        echo ""
+        echo "$qa_section"
+      } >> "$claude_md"
+    fi
+  else
+    # Create CLAUDE.md
+    printf "# CLAUDE.md\n\n%s\n" "$qa_section" > "$claude_md"
+  fi
+}
+
+# ─── End qa-progress.txt helpers ──────────────────────────────────────────────
+
+# Initialize progress file now that RUN_ID is set
+init_progress_file
+
 extract_tag_text() {
   local file_path="$1"
   local tag="$2"
@@ -173,6 +448,7 @@ run_test() {
   local status="FAIL"
   local reason=""
   local evidence=""
+  local learnings=""
 
   test_id="$(jq -r '.id' <<< "$test_json")"
   title="$(jq -r '.title' <<< "$test_json")"
@@ -187,6 +463,61 @@ run_test() {
   stderr_file="$test_dir/stderr.log"
   status_file="$test_dir/status.txt"
   result_json="$test_dir/result.json"
+
+  # --- Resume check: skip if already PASS in this run ---
+  if check_already_passed "$RUN_ID" "$test_id"; then
+    echo "  [SKIP] $test_id already PASS in run $RUN_ID (resume)" >&2
+    status="PASS"
+    reason="Skipped — already passed in this run (resume)"
+    evidence="(skipped)"
+
+    echo "PASS" > "$status_file"
+    printf "" > "$output_file"
+    printf "" > "$stderr_file"
+
+    jq -n \
+      --arg id "$test_id" \
+      --arg title "$title" \
+      --arg level "$level" \
+      --arg priority "$priority" \
+      --arg status "$status" \
+      --arg reason "$reason" \
+      --arg evidence "$evidence" \
+      --arg tool "$TOOL" \
+      --arg outputFile "$output_file" \
+      --arg stderrFile "$stderr_file" \
+      --arg executedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      --argjson toolExit 0 \
+      '{
+        id: $id,
+        title: $title,
+        level: $level,
+        priority: $priority,
+        tool: $tool,
+        status: $status,
+        reason: $reason,
+        evidence: $evidence,
+        toolExitCode: $toolExit,
+        outputFile: $outputFile,
+        stderrFile: $stderrFile,
+        executedAt: $executedAt
+      }' > "$result_json"
+
+    mkdir -p "$RUN_DIR/tests/$test_id"
+    cp "$prompt_file" "$RUN_DIR/tests/$test_id/prompt.md" 2>/dev/null || touch "$RUN_DIR/tests/$test_id/prompt.md"
+    cp "$output_file" "$RUN_DIR/tests/$test_id/agent-output.txt"
+    cp "$stderr_file" "$RUN_DIR/tests/$test_id/stderr.log"
+    cp "$status_file" "$RUN_DIR/tests/$test_id/status.txt"
+    cp "$result_json" "$RUN_DIR/tests/$test_id/result.json"
+
+    cat "$result_json" >> "$suite_outcomes_file"
+    echo >> "$suite_outcomes_file"
+    return 0
+  fi
+
+  # --- Read codebase patterns for context injection ---
+  local codebase_patterns
+  codebase_patterns="$(get_codebase_patterns)"
 
   # Derive expected test file path from level and test ID
   local test_file_hint=""
@@ -206,6 +537,12 @@ run_test() {
     echo "Title: $title"
     echo "Level: $level"
     echo "Priority: $priority"
+    echo ""
+    echo "## Codebase Context (from qa-progress.txt)"
+    echo ""
+    echo "$codebase_patterns"
+    echo ""
+    echo "Use the patterns above to avoid known pitfalls and apply known working approaches."
     echo ""
     echo "You are executing one deterministic QA test case from a JSON test plan."
     echo "Your job has two phases:"
@@ -253,6 +590,18 @@ run_test() {
     echo "<status>PASS</status> or <status>FAIL</status>"
     echo "<evidence>...concise evidence from test output...</evidence>"
     echo "<reason>...concise failure reason when FAIL...</reason>"
+    echo "<learnings>...reusable patterns, gotchas, or insights discovered during this test that would help future tests...</learnings>"
+    echo ""
+    echo "Also append your findings to \`qa-progress.txt\` in the project root using the following format:"
+    echo ""
+    echo "\`\`\`"
+    echo "### $test_id [PASS|FAIL] $title"
+    echo "- What worked / what failed"
+    echo "- **Learnings:**"
+    echo "  - Pattern discovered"
+    echo "  - Gotcha encountered"
+    echo "---"
+    echo "\`\`\`"
   } > "$prompt_file"
 
   if [[ "$TOOL" == "codex" ]]; then
@@ -278,8 +627,12 @@ run_test() {
 
   reason="$(extract_tag_text "$output_file" "reason" || true)"
   evidence="$(extract_tag_text "$output_file" "evidence" || true)"
+  learnings="$(extract_tag_text "$output_file" "learnings" || true)"
 
   echo "$status" > "$status_file"
+
+  # Append test result to qa-progress.txt
+  append_test_progress "$test_id" "$title" "$status" "$evidence" "$reason" "$learnings"
 
   jq -n \
     --arg id "$test_id" \
@@ -415,7 +768,8 @@ PY
 run_remediation() {
   local loop_index="$1"
   local failed_ids_json="$2"
-  local remediation_dir="$RUN_DIR/remediation/loop-$(printf '%02d' "$loop_index")"
+  local loop_label="loop-$(printf '%02d' "$loop_index")"
+  local remediation_dir="$RUN_DIR/remediation/$loop_label"
   local prompt_file="$remediation_dir/prompt.md"
   local output_file="$remediation_dir/agent-output.txt"
   local stderr_file="$remediation_dir/stderr.log"
@@ -431,11 +785,21 @@ run_remediation() {
     | map({id, title, reason, outputFile, stderrFile})
   ' "$LATEST_FULL_OUTCOMES_FILE" > "$test_context_file"
 
+  # --- Read codebase patterns for context injection ---
+  local codebase_patterns
+  codebase_patterns="$(get_codebase_patterns)"
+
   {
     echo "# QA Remediation Loop"
     echo ""
     echo "Run ID: $RUN_ID"
     echo "Loop: $loop_index"
+    echo ""
+    echo "## Codebase Context (from qa-progress.txt)"
+    echo ""
+    echo "$codebase_patterns"
+    echo ""
+    echo "Use the patterns above to avoid known pitfalls and apply known working approaches."
     echo ""
     echo "You are fixing failing QA tests in this repository."
     echo ""
@@ -470,7 +834,9 @@ run_remediation() {
     set -e
   fi
 
+  local remediation_result="BLOCKED"
   if [[ "$tool_exit" -eq 0 ]] && grep -q "<status>PATCHED</status>" "$output_file"; then
+    remediation_result="PATCHED"
     echo "PATCHED" > "$status_file"
   else
     echo "BLOCKED" > "$status_file"
@@ -479,6 +845,21 @@ run_remediation() {
   extract_root_causes_json "$output_file" > "$root_causes_file"
 
   LAST_ROOT_CAUSES_JSON="$(cat "$root_causes_file")"
+
+  # Extract failed IDs as a readable list
+  local failed_ids_list
+  failed_ids_list="$(jq -r '.[]' <<< "$failed_ids_json" | tr '\n' ' ' | sed 's/ $//')"
+
+  # Extract root causes as readable text
+  local root_causes_text
+  root_causes_text="$(jq -r '.[]' "$root_causes_file" | head -5 | tr '\n' '; ' | sed 's/; $//')"
+
+  # Extract summary from agent output
+  local fixes_summary
+  fixes_summary="$(extract_tag_text "$output_file" "summary" || true)"
+
+  # Append remediation entry to qa-progress.txt
+  append_remediation_progress "$loop_label" "$failed_ids_list" "${root_causes_text:-none identified}" "${fixes_summary:-none}" "$remediation_result"
 }
 
 LOOPS_PERFORMED=0
@@ -592,7 +973,14 @@ jq -n \
 
 echo "$FINAL_STATUS" > "$RUN_DIR/status.txt"
 
+# --- Post-run: distill learnings and seed CLAUDE.md on successful run ---
+if [[ "$FINAL_STATUS" == "PASS" ]]; then
+  update_codebase_patterns
+  seed_claude_md
+fi
+
 echo "QA loop run directory: $RUN_DIR"
+echo "QA progress log: $PROGRESS_FILE"
 echo "Machine-readable status: $FINAL_STATUS"
 
 if [[ "$FINAL_STATUS" == "PASS" ]]; then

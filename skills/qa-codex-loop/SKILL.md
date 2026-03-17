@@ -198,6 +198,90 @@ Per remediation loop (`logs/qa-loop/<run-id>/remediation/loop-XX/`):
 
 ---
 
+## qa-progress.txt — Cross-Test Learning and Audit Trail
+
+`qa-progress.txt` is a persistent log in the project workspace root (`$WORKSPACE_DIR` or `pwd`). It accumulates across runs and serves five purposes:
+
+| Purpose | Description |
+|---|---|
+| Cross-test learning | Patterns/gotchas from one test are injected into subsequent test prompts |
+| Run resume/continuity | If the loop crashes, already-PASS tests are skipped on restart |
+| Cross-run trend tracking | Accumulates history across multiple runs (flaky tests, regressions visible) |
+| Remediation audit trail | Root causes and fixes recorded — prevents the same wrong fix being retried |
+| CLAUDE.md seeding | After a successful run, distilled patterns are written to project `CLAUDE.md` |
+
+### File Location
+
+`qa-progress.txt` lives at `$WORKSPACE_DIR/qa-progress.txt` (same dir `qa-codex-loop.sh` is run from by default). Override with `--workspace-dir`.
+
+### File Structure
+
+```
+# QA Progress Log
+Started: <date>
+---
+
+## Codebase Patterns
+(distilled reusable patterns from all runs — updated after each run)
+
+---
+
+## Run: <run-id> [<date>]
+
+### TC-001 [PASS|FAIL] <title>
+- **Evidence:** ...
+- **Failed:** ... (when FAIL)
+- **Learnings:**
+  - Pattern discovered
+  - Gotcha encountered
+---
+
+### TC-002 [PASS|FAIL] <title>
+...
+
+## Remediation: <run-id> loop-01
+- Failed tests: TC-XXX, TC-YYY
+- Root causes identified: ...
+- Fixes applied: ...
+- Result: PATCHED|BLOCKED
+---
+```
+
+### Bash Functions
+
+| Function | Purpose |
+|---|---|
+| `init_progress_file` | Creates `qa-progress.txt` with header + empty Codebase Patterns section if missing; appends new run header if exists |
+| `get_codebase_patterns` | Extracts `## Codebase Patterns` section for injection into test/remediation prompts |
+| `check_already_passed` | Returns 0 if `TC-XXX [PASS]` already exists for this `RUN_ID` (resume/skip logic) |
+| `append_test_progress` | Appends per-test result block (status, evidence, learnings) after each test |
+| `append_remediation_progress` | Appends remediation summary block (root causes, fixes, result) after each loop |
+| `update_codebase_patterns` | After a PASS run, distills all `Learnings:` bullets from this run into the top-level `## Codebase Patterns` section |
+| `seed_claude_md` | After a PASS run, writes/updates a `## QA Patterns` section in project `CLAUDE.md` with current Codebase Patterns |
+
+### Required Response Tag: `<learnings>`
+
+Each test prompt now requires a `<learnings>` tag in addition to `<status>`, `<evidence>`, `<reason>`:
+
+```
+<learnings>...reusable patterns, gotchas, or insights discovered during this test that would help future tests...</learnings>
+```
+
+The `extract_tag_text` helper (already used for `<status>`, `<evidence>`, `<reason>`) extracts the learnings content. The script then appends it to `qa-progress.txt` via `append_test_progress`.
+
+### Resume Behavior
+
+On each test, before running, `check_already_passed "$RUN_ID" "$test_id"` is called. If the test already has a `[PASS]` entry under this run's section in `qa-progress.txt`, the test is skipped with `status=PASS` (logged as "resume"). This makes the loop resilient to crashes without re-running passing tests.
+
+### CLAUDE.md Seeding
+
+At end of a successful (all-PASS) run:
+
+1. `update_codebase_patterns` distills new `Learnings:` bullets from the run into the `## Codebase Patterns` section at the top of `qa-progress.txt` (deduplicating against existing patterns).
+2. `seed_claude_md` reads the updated patterns and writes them to `$WORKSPACE_DIR/CLAUDE.md` under a `## QA Patterns` heading — creating the file if it doesn't exist, replacing the section if it does.
+
+---
+
 ## Handoff
 
 Standard QA pipeline handoff:
@@ -220,3 +304,6 @@ Before returning execution result:
 - [ ] Loop controls are enforced (`max-loops`, optional `max-duration`, optional `max-patch-count`)
 - [ ] Per-test outcomes and aggregate summary are written
 - [ ] Machine-readable `PASS`/`FAIL` status emitted
+- [ ] `qa-progress.txt` initialized and updated across tests and remediation loops
+- [ ] Resume capability: already-PASS tests skipped on restart
+- [ ] On PASS run: `## Codebase Patterns` updated and `CLAUDE.md` seeded
